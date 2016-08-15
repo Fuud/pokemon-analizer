@@ -4,6 +4,8 @@ ADD . /pokemons/
 
 WORKDIR /pokemons
 
+RUN ls -a
+
 RUN mvn clean install
 
 RUN chmod +x /pokemons/src/main/scripts/start.sh
