@@ -7,17 +7,16 @@ import POGOProtos.Networking.Requests.Messages.ReleasePokemonMessageOuterClass;
 import POGOProtos.Networking.Requests.RequestTypeOuterClass;
 import POGOProtos.Networking.Responses.EvolvePokemonResponseOuterClass;
 import POGOProtos.Networking.Responses.ReleasePokemonResponseOuterClass;
-import com.google.protobuf.InvalidProtocolBufferException;
 import com.pokegoapi.api.PokemonGo;
 import com.pokegoapi.api.inventory.CandyJar;
 import com.pokegoapi.api.inventory.Inventories;
-import com.pokegoapi.api.map.pokemon.EvolutionResult;
 import com.pokegoapi.api.pokemon.Pokemon;
 import com.pokegoapi.api.pokemon.PokemonDetails;
 import com.pokegoapi.api.pokemon.PokemonMeta;
 import com.pokegoapi.api.pokemon.PokemonMetaRegistry;
 import com.pokegoapi.auth.GoogleUserCredentialProvider;
 import com.pokegoapi.main.ServerRequest;
+import fuud.dto.HttpResult;
 import j2html.tags.ContainerTag;
 import j2html.tags.EmptyTag;
 import j2html.tags.Tag;
@@ -28,14 +27,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.view.RedirectView;
-
-import static j2html.TagCreator.*;
 
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import static j2html.TagCreator.*;
 
 @RestController
 public class Endpoint {
@@ -75,8 +73,8 @@ public class Endpoint {
         ).render();
     }
 
-    @RequestMapping(method = RequestMethod.GET, value = "evolve", produces = MediaType.TEXT_PLAIN_VALUE)
-    public String evolve(@RequestParam("pokemonId") long pokemonId, @RequestParam(value = "refreshToken") String refreshToken) throws Exception {
+    @RequestMapping(method = RequestMethod.GET, value = "evolve")
+    public HttpResult evolve(@RequestParam("pokemonId") long pokemonId, @RequestParam(value = "refreshToken") String refreshToken) throws Exception {
         try {
             PokemonGo go = new PokemonGo(new GoogleUserCredentialProvider(httpClient, refreshToken), httpClient);
 
@@ -92,21 +90,22 @@ public class Endpoint {
                     EvolvePokemonResponseOuterClass.EvolvePokemonResponse.parseFrom(serverRequest.getData());
 
             if (response.getResult() == EvolvePokemonResponseOuterClass.EvolvePokemonResponse.Result.SUCCESS) {
-                return "Pokemon successfully evolved.\n" +
+                String message = "Pokemon successfully evolved.\n" +
                         "New pokemon: " + response.getEvolvedPokemonData().getPokemonId().name() + ";\n" +
                         "Experience awarded: " + response.getExperienceAwarded() + ";\n" +
                         "Candy awarded: " + response.getCandyAwarded();
+                return new HttpResult(true, message);
             } else {
-                return "Can not evolve pokemon because of " + response.getResult();
+                return new HttpResult(false, "Can not evolve pokemon because of " + response.getResult());
             }
         } catch (Exception e) {
             e.printStackTrace();
-            return "Can not evolve pokemon because of " + e.getMessage();
+            return new HttpResult(false, "Can not evolve pokemon because of " + e.getMessage());
         }
     }
 
-    @RequestMapping(method = RequestMethod.GET, value = "transfer", produces = MediaType.TEXT_PLAIN_VALUE)
-    public String transfer(@RequestParam("pokemonId") long pokemonId, @RequestParam(value = "refreshToken") String refreshToken) {
+    @RequestMapping(method = RequestMethod.GET, value = "transfer")
+    public HttpResult transfer(@RequestParam("pokemonId") long pokemonId, @RequestParam(value = "refreshToken") String refreshToken) {
         try {
             PokemonGo go = new PokemonGo(new GoogleUserCredentialProvider(httpClient, refreshToken), httpClient);
             ReleasePokemonMessageOuterClass.ReleasePokemonMessage reqMsg =
@@ -121,14 +120,15 @@ public class Endpoint {
             response = ReleasePokemonResponseOuterClass.ReleasePokemonResponse.parseFrom(serverRequest.getData());
 
             if (response.getResult() == ReleasePokemonResponseOuterClass.ReleasePokemonResponse.Result.SUCCESS) {
-                return "Pokemon successfully transferred.\n" +
-                        "Candy awarded: " + response.getCandyAwarded();
+                return new HttpResult(true,
+                        "Pokemon successfully transferred.\n" +
+                        "Candy awarded: " + response.getCandyAwarded());
             } else {
-                return "Can not transfer pokemon because of " + response.getResult();
+                return new HttpResult(false, "Can not transfer pokemon because of " + response.getResult());
             }
         } catch (Exception e) {
             e.printStackTrace();
-            return "Can not transfer pokemon because of " + e.getMessage();
+            return new HttpResult(false, "Can not transfer pokemon because of " + e.getMessage());
         }
     }
 
@@ -146,7 +146,7 @@ public class Endpoint {
         );
     }
 
-    private final List<Tag> generatePokemonRows(List<Pokemon> pokemons, CandyJar candyjar, String refreshToken) {
+    private List<Tag> generatePokemonRows(List<Pokemon> pokemons, CandyJar candyjar, String refreshToken) {
         final Map<PokemonIdOuterClass.PokemonId, List<Pokemon>> pokemonsById = pokemons.stream().collect(Collectors.toMap(
                 PokemonDetails::getPokemonId,
                 Collections::singletonList,
@@ -265,61 +265,61 @@ public class Endpoint {
     public static int getStartdustCostsForPowerup(float level) {
         // Based on http://pokemongo.gamepress.gg/power-up-costs
         int powerups = 0;
-        if (level < 3 && powerups <= 4) {
+        if (level < 3) {
             return 200;
         }
-        if (level < 4 && powerups <= 8) {
+        if (level < 4) {
             return 400;
         }
-        if (level < 7 && powerups <= 12) {
+        if (level < 7) {
             return 600;
         }
-        if (level < 8 && powerups <= 16) {
+        if (level < 8) {
             return 800;
         }
-        if (level < 11 && powerups <= 20) {
+        if (level < 11) {
             return 1000;
         }
-        if (level < 13 && powerups <= 24) {
+        if (level < 13) {
             return 1300;
         }
-        if (level < 15 && powerups <= 28) {
+        if (level < 15) {
             return 1600;
         }
-        if (level < 17 && powerups <= 32) {
+        if (level < 17) {
             return 1900;
         }
-        if (level < 19 && powerups <= 36) {
+        if (level < 19) {
             return 2200;
         }
-        if (level < 21 && powerups <= 40) {
+        if (level < 21) {
             return 2500;
         }
-        if (level < 23 && powerups <= 44) {
+        if (level < 23) {
             return 3000;
         }
-        if (level < 25 && powerups <= 48) {
+        if (level < 25) {
             return 3500;
         }
-        if (level < 27 && powerups <= 52) {
+        if (level < 27) {
             return 4000;
         }
-        if (level < 29 && powerups <= 56) {
+        if (level < 29) {
             return 4500;
         }
-        if (level < 31 && powerups <= 60) {
+        if (level < 31) {
             return 5000;
         }
-        if (level < 33 && powerups <= 64) {
+        if (level < 33) {
             return 6000;
         }
-        if (level < 35 && powerups <= 68) {
+        if (level < 35) {
             return 7000;
         }
-        if (level < 37 && powerups <= 72) {
+        if (level < 37) {
             return 8000;
         }
-        if (level < 39 && powerups <= 76) {
+        if (level < 39) {
             return 9000;
         }
         return 10000;
@@ -355,9 +355,9 @@ public class Endpoint {
             return "" + max;
         } else {
             return "V" + getNormalizedMaxCp(individualAttack, individualDefense, individualStamina, PokemonIdOuterClass.PokemonId.VAPOREON) +
-                    " / " +
+                    " " +
                     "J" + getNormalizedMaxCp(individualAttack, individualDefense, individualStamina, PokemonIdOuterClass.PokemonId.JOLTEON) +
-                    " / " +
+                    " " +
                     "F" + getNormalizedMaxCp(individualAttack, individualDefense, individualStamina, PokemonIdOuterClass.PokemonId.FLAREON);
 
         }
@@ -373,11 +373,11 @@ public class Endpoint {
     }
 
     private EmptyTag createEvolveButton(long id, String refreshToken) {
-        return input().withType("button").withValue("Evolve").attr("onClick", "evolvePokemon(\"" + id + "\", \"" + refreshToken + "\")");
+        return input().withType("button").withValue("Evolve").attr("onClick", "evolvePokemon(this, \"" + id + "\", \"" + refreshToken + "\")");
     }
 
     private EmptyTag createTransferButton(long id, String refreshToken) {
-        return input().withType("button").withValue("Transfer").attr("onClick", "transferPokemon(\"" + id + "\", \"" + refreshToken + "\")");
+        return input().withType("button").withValue("Transfer").attr("onClick", "transferPokemon(this, \"" + id + "\", \"" + refreshToken + "\")");
     }
 
     private String imageFor(int pokemonIdNumber) {

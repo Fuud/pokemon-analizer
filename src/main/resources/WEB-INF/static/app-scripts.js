@@ -1,27 +1,43 @@
-function evolvePokemon(pokemonId, refreshToken) {
-    $.get(
-        "evolve",
-        {
-            pokemonId : pokemonId,
-            refreshToken : refreshToken
+function evolvePokemon(button, pokemonId, refreshToken) {
+    button.disabled = true;
+    button.value = "Evolving...";
+    $.ajax({
+        url: "evolve?pokemonId=" + pokemonId + "&refreshToken=" + refreshToken,
+        success: function (data) {
+            if (data.result) {
+                button.value = "Already evolved";
+            } else {
+                alert(data.reason);
+                button.disabled = false;
+                button.value = "Done";
+            }
         },
-        function(data) {
-            alert(data);
-            console.log(data);
+        error: function (xmlHttpRequest, textStatus, errorThrown) {
+            alert(xmlHttpRequest.status + " : " + textStatus);
+            button.disabled = false;
+            button.value = "Evolve";
         }
-    );
+    });
 }
 
-function transferPokemon(pokemonId, refreshToken) {
-    $.get(
-        "transfer",
-        {
-            pokemonId : pokemonId,
-            refreshToken : refreshToken
+function transferPokemon(button, pokemonId, refreshToken) {
+    button.disabled = true;
+    button.value = "Transferring...";
+    $.ajax({
+        url: "transfer?pokemonId=" + pokemonId + "&refreshToken=" + refreshToken,
+        success: function (data) {
+            if (data.result) {
+                button.value = "Done";
+            } else {
+                alert(data.reason);
+                button.disabled = false;
+                button.value = "Transfer";
+            }
         },
-        function(data) {
-            alert(data);
-            console.log(data);
+        error: function (xmlHttpRequest, textStatus, errorThrown) {
+            alert(xmlHttpRequest.status + " : " + textStatus);
+            button.disabled = false;
+            button.value = "Transfer";
         }
-    );
+    });
 }
