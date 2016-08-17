@@ -58,6 +58,9 @@ public class Endpoint {
         final CandyJar candyjar = inventories.getCandyjar();
 
 
+        final long todayCount = pokemons.stream().filter(this::isToday).count();
+        final long yesterdayCount = pokemons.stream().filter(this::isYesterday).count();
+
         return html().with(
                 head().with(
                         link().withRel("stylesheet").withHref("style.css"),
@@ -65,7 +68,7 @@ public class Endpoint {
                         script().withType("text/javascript").withSrc("app-scripts.js")
                 ),
                 body().with(
-                        h1("Pokemons " + pokemons.size()),
+                        h1("Pokemons " + pokemons.size() + " (today: " + todayCount + "; yesterday: " + yesterdayCount+")"),
                         table().with(
                                 generatePokemonRows(pokemons, candyjar, refreshToken)
                         )
@@ -122,7 +125,7 @@ public class Endpoint {
             if (response.getResult() == ReleasePokemonResponseOuterClass.ReleasePokemonResponse.Result.SUCCESS) {
                 return new HttpResult(true,
                         "Pokemon successfully transferred.\n" +
-                        "Candy awarded: " + response.getCandyAwarded());
+                                "Candy awarded: " + response.getCandyAwarded());
             } else {
                 return new HttpResult(false, "Can not transfer pokemon because of " + response.getResult());
             }
@@ -198,9 +201,8 @@ public class Endpoint {
                             for (int i = 0; i < pokemonsOfType.size(); i++) {
                                 final Pokemon pokemon = pokemonsOfType.get(i);
 
-                                final Date creationDate = new Date(pokemon.getCreationTimeMs());
-                                final boolean isSuperFresh = DateUtils.isSameDay(new Date(), creationDate);
-                                final boolean isFresh = isYesterday(creationDate);
+                                final boolean isSuperFresh = isToday(pokemon);
+                                final boolean isFresh = isYesterday(pokemon);
 
                                 final String freshImage;
                                 if (isSuperFresh) {
@@ -236,7 +238,7 @@ public class Endpoint {
                                                         createEvolveButton(pokemon.getId(), refreshToken)
                                                 ),
                                                 td().with(
-                                                        img().withSrc("/sprites/" + freshImage).attr("width", "16px").attr("height", "16px").attr("title", creationDate.toString())
+                                                        img().withSrc("/sprites/" + freshImage).attr("width", "16px").attr("height", "16px").attr("title", new Date(pokemon.getCreationTimeMs()).toString())
                                                 )
                                         )
                                 );
@@ -247,7 +249,12 @@ public class Endpoint {
         return result;
     }
 
-    private boolean isYesterday(Date creationDate) {
+    private boolean isToday(Pokemon pokemon) {
+        return DateUtils.isSameDay(new Date(), new Date(pokemon.getCreationTimeMs()));
+    }
+
+    private boolean isYesterday(Pokemon pokemon) {
+        Date creationDate = new Date(pokemon.getCreationTimeMs());
         final Calendar calendar = GregorianCalendar.getInstance();
         calendar.setTime(new Date());
         calendar.add(Calendar.DATE, -1);
