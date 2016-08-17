@@ -1,0 +1,61 @@
+<configuration debug="false" scan="true">
+    <property name="component" value="pokemons"/>
+    <property name="minLevel" value="DEBUG"/>
+    <property name="logDirectory" value="/var/log/${component}"/>
+
+    <property name="messagePattern" value="%date{ISO8601} [%thread] %-5level - [%X] %logger{36} - %msg%n"/>
+
+    <appender name="MAIN-FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${logDirectory}/${component}.main.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- rollover daily -->
+            <fileNamePattern>${logDirectory}/${component}.main.log-%d{yyyyMMdd}.%i.gz</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <!-- or whenever the file size reaches limit -->
+                <maxFileSize>1024MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <!-- keep 6 days' worth of history -->
+            <maxHistory>6</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${messagePattern}</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="ERROR-FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${logDirectory}/${component}.error.log</file>
+
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- rollover daily -->
+            <fileNamePattern>${logDirectory}/${component}.error.log-%d{yyyyMMdd}.%i.gz</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <!-- or whenever the file size reaches limit -->
+                <maxFileSize>1024MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <!-- keep 6 days' worth of history -->
+            <maxHistory>6</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${messagePattern}</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${messagePattern}</pattern>
+        </encoder>
+    </appender>
+
+    <root level="${minLevel}">
+        <if condition='property("LOGBACK_WRITE_TO_FILE").equals("true")'>
+            <then>
+                <appender-ref ref="MAIN-FILE"/>
+                <appender-ref ref="ERROR-FILE"/>
+            </then>
+            <else>
+                <appender-ref ref="STDOUT"/>
+            </else>
+        </if>
+    </root>
+
+</configuration>
