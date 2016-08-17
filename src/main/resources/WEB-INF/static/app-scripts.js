@@ -41,3 +41,7 @@ function transferPokemon(button, pokemonId, refreshToken) {
         }
     });
 }
+
+function enableActions() {
+    $("input[type=button]").removeAttr("disabled", "disabled");
+}

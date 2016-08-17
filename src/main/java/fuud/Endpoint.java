@@ -69,6 +69,10 @@ public class Endpoint {
                 ),
                 body().with(
                         h1("Pokemons " + pokemons.size() + " (today: " + todayCount + "; yesterday: " + yesterdayCount+")"),
+                        br(),
+                        input().withType("button").withValue("Enable actions").attr("onClick", "enableActions()"),
+                        br(),
+                        br(),
                         table().with(
                                 generatePokemonRows(pokemons, candyjar, refreshToken)
                         )
@@ -380,11 +384,11 @@ public class Endpoint {
     }
 
     private EmptyTag createEvolveButton(long id, String refreshToken) {
-        return input().withType("button").withValue("Evolve").attr("onClick", "evolvePokemon(this, \"" + id + "\", \"" + refreshToken + "\")");
+        return input().withType("button").withValue("Evolve").attr("disabled", "disabled").attr("onClick", "evolvePokemon(this, \"" + id + "\", \"" + refreshToken + "\")");
     }
 
     private EmptyTag createTransferButton(long id, String refreshToken) {
-        return input().withType("button").withValue("Transfer").attr("onClick", "transferPokemon(this, \"" + id + "\", \"" + refreshToken + "\")");
+        return input().withType("button").withValue("Transfer").attr("disabled", "disabled").attr("onClick", "transferPokemon(this, \"" + id + "\", \"" + refreshToken + "\")");
     }
 
     private String imageFor(int pokemonIdNumber) {
