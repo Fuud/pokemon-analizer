@@ -13,5 +13,6 @@ RUN chmod +x /pokemons/src/main/scripts/start.sh
 CMD /pokemons/src/main/scripts/start.sh
 
 EXPOSE 8080
+EXPOSE 12345
 
 VOLUME /var/log/
