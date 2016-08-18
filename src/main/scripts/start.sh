@@ -1,1 +1,1 @@
-java -cp "./target/packaged/lib/*" fuud.Main
+java -cp "./target/packaged/lib/*" $ADDITIONAL_JAVA_OPTS fuud.Main
