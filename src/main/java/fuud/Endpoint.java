@@ -286,7 +286,7 @@ public class Endpoint {
                                                 td("" + getRemindingDust(pokemon.getLevel())),
                                                 td(" ").attr("bgcolor", !candidateForEvolve ? "green" : "transparent"),
                                                 td().with(
-                                                        createTransferButton(pokemon.getId(), refreshToken)
+                                                        createTransferButton(pokemon.getId(), pokemon.isFavorite(), refreshToken)
                                                 ),
 
                                                 td(" ").attr("bgcolor", candidateForEvolve ? "green" : "transparent"),
@@ -439,8 +439,14 @@ public class Endpoint {
         return input().withType("button").withValue("Evolve").attr("disabled", "disabled").attr("onClick", "evolvePokemon(this, \"" + id + "\", \"" + refreshToken + "\")");
     }
 
-    private EmptyTag createTransferButton(long id, String refreshToken) {
-        return input().withType("button").withValue("Transfer").attr("disabled", "disabled").attr("onClick", "transferPokemon(this, \"" + id + "\", \"" + refreshToken + "\")");
+    private EmptyTag createTransferButton(long id, boolean isFavorite, String refreshToken) {
+        final String onClick;
+        if (isFavorite) {
+            onClick = "alert('This pokemon was marked as favorite. To transfer remove favorite mark and refresh this page')";
+        } else {
+            onClick = "transferPokemon(this, ':id', ':refreshToken')".replace(":id", "" + id).replace(":refreshToken", refreshToken);
+        }
+        return input().withType("button").withValue("Transfer").attr("disabled", "disabled").attr("onClick", onClick);
     }
 
     private String imageFor(int pokemonIdNumber) {
