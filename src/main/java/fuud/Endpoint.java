@@ -56,6 +56,8 @@ public class Endpoint {
     public String pokemonList(@RequestParam(value = "refreshToken") String refreshToken) throws Exception {
         PokemonGo go = new PokemonGo(new GoogleUserCredentialProvider(httpClient, refreshToken), httpClient);
 
+        final String username = go.getPlayerProfile().getPlayerData().getUsername();
+
         // After this you can access the api from the PokemonGo instance :
         final Inventories inventories = go.getInventories();// to get all his inventories (Pokemon, backpack, egg, incubator)
 
@@ -73,9 +75,12 @@ public class Endpoint {
                         script().withType("text/javascript").withSrc("app-scripts.js")
                 ),
                 body().with(
-                        h1("Pokemons " + pokemons.size() + " (today: " + todayCount + "; yesterday: " + yesterdayCount + ")"),
+                        h1(username).attr("align", "center"),
+                        h1("Pokemons " + pokemons.size() + " (today: " + todayCount + "; yesterday: " + yesterdayCount + ")").attr("align", "center"),
                         br(),
-                        input().withType("button").withValue("Enable actions").attr("onClick", "enableActions()"),
+                        div().attr("style", "text-align:center").with(
+                                input().withType("button").withValue("Enable actions").attr("onClick", "enableActions()")
+                        ),
                         br(),
                         br(),
                         table().attr("style", "margin-left: auto; margin-right: auto;").with(
