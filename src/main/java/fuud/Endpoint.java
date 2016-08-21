@@ -32,7 +32,12 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.view.RedirectView;
+import sun.util.resources.TimeZoneNames;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -42,6 +47,7 @@ import static j2html.TagCreator.*;
 
 @RestController
 public class Endpoint {
+    public static final TimeZone TIME_ZONE_MOSCOW = TimeZone.getTimeZone("Europe/Moscow");
     private final OkHttpClient httpClient = new OkHttpClient();
 
     @RequestMapping(method = RequestMethod.GET, value = "get-refresh-token")
@@ -268,6 +274,9 @@ public class Endpoint {
                                     favoriteImage = "non-favorite.png";
                                 }
 
+                                ZonedDateTime creationDateTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(pokemon.getCreationTimeMs()), ZoneId.of(TIME_ZONE_MOSCOW.getID()));
+
+                                final String creationTimeString = creationDateTime.toString();
 
                                 final boolean candidateForEvolve = i < availableEvolutionCount;
                                 result.add(
@@ -299,7 +308,7 @@ public class Endpoint {
                                                         createEvolveButton(pokemon.getId(), refreshToken)
                                                 ),
                                                 td().with(
-                                                        img().withSrc("/sprites/" + freshImage).attr("width", "16px").attr("height", "16px").attr("title", new Date(pokemon.getCreationTimeMs()).toString())
+                                                        img().withSrc("/sprites/" + freshImage).attr("width", "16px").attr("height", "16px").attr("title", creationTimeString)
                                                 )
                                         )
                                 );
@@ -316,7 +325,7 @@ public class Endpoint {
 
     private boolean isYesterday(Pokemon pokemon) {
         Date creationDate = new Date(pokemon.getCreationTimeMs());
-        final Calendar calendar = GregorianCalendar.getInstance();
+        final Calendar calendar = GregorianCalendar.getInstance(TIME_ZONE_MOSCOW);
         calendar.setTime(new Date());
         calendar.add(Calendar.DATE, -1);
         return DateUtils.isSameDay(calendar.getTime(), creationDate);
