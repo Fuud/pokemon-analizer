@@ -42,6 +42,26 @@ function transferPokemon(button, pokemonId, refreshToken) {
     });
 }
 
+function setFavorite(image, pokemonId, favorite, refreshToken) {
+    $.ajax({
+        url: "favoritize?pokemonId=" + pokemonId + "&favorite="+favorite+"&refreshToken=" + refreshToken,
+        success: function (data) {
+            if (data.result) {
+                if (favorite){
+                    image.src = "/sprites/favorite.png";
+                }else {
+                    image.src = "/sprites/non-favorite.png";
+                }
+            } else {
+                alert(data.reason);
+            }
+        },
+        error: function (xmlHttpRequest, textStatus, errorThrown) {
+            alert(xmlHttpRequest.status + " : " + textStatus);
+        }
+    });
+}
+
 function enableActions() {
     $("input[type=button]").removeAttr("disabled", "disabled");
 }

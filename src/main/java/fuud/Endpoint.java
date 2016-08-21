@@ -4,9 +4,12 @@ import POGOProtos.Enums.PokemonFamilyIdOuterClass;
 import POGOProtos.Enums.PokemonIdOuterClass;
 import POGOProtos.Networking.Requests.Messages.EvolvePokemonMessageOuterClass;
 import POGOProtos.Networking.Requests.Messages.ReleasePokemonMessageOuterClass;
+import POGOProtos.Networking.Requests.Messages.SetFavoritePokemonMessageOuterClass;
 import POGOProtos.Networking.Requests.RequestTypeOuterClass;
 import POGOProtos.Networking.Responses.EvolvePokemonResponseOuterClass;
 import POGOProtos.Networking.Responses.ReleasePokemonResponseOuterClass;
+import POGOProtos.Networking.Responses.SetFavoritePokemonResponseOuterClass;
+import com.google.protobuf.InvalidProtocolBufferException;
 import com.pokegoapi.api.PokemonGo;
 import com.pokegoapi.api.inventory.CandyJar;
 import com.pokegoapi.api.inventory.Inventories;
@@ -15,6 +18,7 @@ import com.pokegoapi.api.pokemon.PokemonDetails;
 import com.pokegoapi.api.pokemon.PokemonMeta;
 import com.pokegoapi.api.pokemon.PokemonMetaRegistry;
 import com.pokegoapi.auth.GoogleUserCredentialProvider;
+import com.pokegoapi.exceptions.RemoteServerException;
 import com.pokegoapi.main.ServerRequest;
 import fuud.dto.HttpResult;
 import j2html.tags.ContainerTag;
@@ -33,6 +37,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static POGOProtos.Networking.Responses.SetFavoritePokemonResponseOuterClass.SetFavoritePokemonResponse.Result.SUCCESS;
 import static j2html.TagCreator.*;
 
 @RestController
@@ -68,7 +73,7 @@ public class Endpoint {
                         script().withType("text/javascript").withSrc("app-scripts.js")
                 ),
                 body().with(
-                        h1("Pokemons " + pokemons.size() + " (today: " + todayCount + "; yesterday: " + yesterdayCount+")"),
+                        h1("Pokemons " + pokemons.size() + " (today: " + todayCount + "; yesterday: " + yesterdayCount + ")"),
                         br(),
                         input().withType("button").withValue("Enable actions").attr("onClick", "enableActions()"),
                         br(),
@@ -81,7 +86,7 @@ public class Endpoint {
     }
 
     @RequestMapping(method = RequestMethod.GET, value = "evolve")
-    public HttpResult evolve(@RequestParam("pokemonId") long pokemonId, @RequestParam(value = "refreshToken") String refreshToken) throws Exception {
+    public HttpResult evolve(@RequestParam("pokemonId") long pokemonId, @RequestParam(value = "refreshToken") String refreshToken) {
         try {
             PokemonGo go = new PokemonGo(new GoogleUserCredentialProvider(httpClient, refreshToken), httpClient);
 
@@ -139,8 +144,39 @@ public class Endpoint {
         }
     }
 
+    @RequestMapping(method = RequestMethod.GET, value = "favoritize")
+    public HttpResult favoritize(@RequestParam("pokemonId") long pokemonId, @RequestParam(value = "favorite") boolean favorite, @RequestParam(value = "refreshToken") String refreshToken) {
+        try {
+            PokemonGo go = new PokemonGo(new GoogleUserCredentialProvider(httpClient, refreshToken), httpClient);
+            SetFavoritePokemonMessageOuterClass.SetFavoritePokemonMessage reqMsg = SetFavoritePokemonMessageOuterClass.SetFavoritePokemonMessage.newBuilder()
+                    .setPokemonId(pokemonId)
+                    .setIsFavorite(favorite)
+                    .build();
+
+            ServerRequest serverRequest = new ServerRequest(RequestTypeOuterClass.RequestType.SET_FAVORITE_POKEMON, reqMsg);
+            go.getRequestHandler().sendServerRequests(serverRequest);
+
+            SetFavoritePokemonResponseOuterClass.SetFavoritePokemonResponse response;
+            try {
+                response = SetFavoritePokemonResponseOuterClass.SetFavoritePokemonResponse.parseFrom(serverRequest.getData());
+            } catch (InvalidProtocolBufferException e) {
+                throw new RemoteServerException(e);
+            }
+
+            if (response.getResult() == SUCCESS) {
+                return new HttpResult(true, "Pokemon is " + (favorite ? "" : "non") + "favorite");
+            } else {
+                return new HttpResult(false, "Can not change favorite because if " + response.getResult());
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new HttpResult(false, "Can not favoritize pokemon because of " + e.getMessage());
+        }
+    }
+
     private ContainerTag generateHeader() {
         return tr().with(
+                th(),
                 th("cp"),
                 th("hp"),
                 th("level"),
@@ -192,7 +228,7 @@ public class Endpoint {
 
                             result.add(
                                     tr().with(
-                                            td().attr("colspan", "13").with(
+                                            td().attr("colspan", "14").with(
                                                     img().withSrc("/sprites/" + imageFor(pokemonId.getNumber())).attr("width", "32px").attr("height", "32px"),
                                                     text(pokemonId.name() + " " + evolutionString + " absMaxCp: " + getAbsoluteMaxCp(pokemonId))
                                             )
@@ -220,10 +256,26 @@ public class Endpoint {
                                 boolean isCool = pokemon.getIndividualAttack() >= 14 && pokemon.getIndividualDefense() >= 14 && pokemon.getIndividualStamina() >= 14;
                                 String coolBg = isCool ? "yellow" : "transparent";
 
+                                final String favoriteImage;
+                                if (pokemon.isFavorite()) {
+                                    favoriteImage = "favorite.png";
+                                } else {
+                                    favoriteImage = "non-favorite.png";
+                                }
+
 
                                 final boolean candidateForEvolve = i < availableEvolutionCount;
                                 result.add(
                                         tr().with(
+                                                td().with(
+                                                        img().withSrc("/sprites/" + favoriteImage).
+                                                                attr("width", "16px").attr("height", "16px")
+                                                                .attr("onClick",
+                                                                        "setFavorite(this, \":pokemonId\", :favorite, \":refreshToken\")".
+                                                                                replace(":pokemonId", "" + pokemon.getId()).
+                                                                                replace(":favorite", "" + !pokemon.isFavorite()).
+                                                                                replace(":refreshToken", refreshToken))
+                                                ),
                                                 td("" + pokemon.getCp()),
                                                 td("" + pokemon.getStamina()),
                                                 td("" + pokemon.getLevel()),
