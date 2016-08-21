@@ -78,7 +78,7 @@ public class Endpoint {
                         input().withType("button").withValue("Enable actions").attr("onClick", "enableActions()"),
                         br(),
                         br(),
-                        table().with(
+                        table().attr("style", "margin-left: auto; margin-right: auto;").with(
                                 generatePokemonRows(pokemons, candyjar, refreshToken)
                         )
                 )
