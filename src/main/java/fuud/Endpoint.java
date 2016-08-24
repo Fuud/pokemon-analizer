@@ -49,7 +49,13 @@ public class Endpoint {
     public RedirectView getRefreshToken(@RequestParam(value = "token") String token) throws Exception {
         final GoogleUserCredentialProvider provider = new GoogleUserCredentialProvider(httpClient);
         provider.login(token);
-        final String withToken = "/pokemon-list?refreshToken=" + provider.getRefreshToken();
+        final String withToken = "/pokemons.html?refreshToken=" + provider.getRefreshToken();
+        return new RedirectView(withToken);
+    }
+
+    @RequestMapping(method = RequestMethod.GET, value = "pokemon-list")
+    public RedirectView pokemonList(@RequestParam(value = "refreshToken") String refreshToken) throws Exception {
+        final String withToken = "/pokemons.html?refreshToken=" + refreshToken;
         return new RedirectView(withToken);
     }
 
