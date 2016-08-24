@@ -1,6 +1,7 @@
 package fuud;
 
 import POGOProtos.Data.PlayerDataOuterClass;
+import POGOProtos.Data.PokemonDataOuterClass;
 import POGOProtos.Enums.PokemonFamilyIdOuterClass;
 import POGOProtos.Enums.PokemonIdOuterClass;
 import POGOProtos.Networking.Requests.Messages.EvolvePokemonMessageOuterClass;
@@ -23,35 +24,25 @@ import com.pokegoapi.auth.GoogleUserCredentialProvider;
 import com.pokegoapi.exceptions.RemoteServerException;
 import com.pokegoapi.main.ServerRequest;
 import fuud.copied.PokemonCpUtils;
-import fuud.dto.HttpResult;
-import fuud.dto.PokemonClassData;
-import fuud.dto.PokemonData;
-import fuud.dto.PokemonListData;
-import j2html.tags.ContainerTag;
-import j2html.tags.EmptyTag;
-import j2html.tags.Tag;
+import fuud.dto.*;
 import okhttp3.OkHttpClient;
-import org.apache.commons.lang3.time.DateUtils;
-import org.springframework.http.MediaType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.view.RedirectView;
 
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static POGOProtos.Networking.Responses.SetFavoritePokemonResponseOuterClass.SetFavoritePokemonResponse.Result.SUCCESS;
-import static j2html.TagCreator.*;
 
 @RestController
 public class Endpoint {
-    public static final TimeZone TIME_ZONE_MOSCOW = TimeZone.getTimeZone("Europe/Moscow");
+    private static final Logger logger = LoggerFactory.getLogger(Endpoint.class);
     private final OkHttpClient httpClient = new OkHttpClient();
 
     @RequestMapping(method = RequestMethod.GET, value = "get-refresh-token")
@@ -60,44 +51,6 @@ public class Endpoint {
         provider.login(token);
         final String withToken = "/pokemon-list?refreshToken=" + provider.getRefreshToken();
         return new RedirectView(withToken);
-    }
-
-    @RequestMapping(method = RequestMethod.GET, value = "pokemon-list", produces = MediaType.TEXT_HTML_VALUE)
-    public String pokemonList(@RequestParam(value = "refreshToken") String refreshToken) throws Exception {
-        PokemonGo go = new PokemonGo(new GoogleUserCredentialProvider(httpClient, refreshToken), httpClient);
-
-        final String username = go.getPlayerProfile().getPlayerData().getUsername();
-
-        // After this you can access the api from the PokemonGo instance :
-        final Inventories inventories = go.getInventories();// to get all his inventories (Pokemon, backpack, egg, incubator)
-
-        final List<Pokemon> pokemons = inventories.getPokebank().getPokemons();
-        final CandyJar candyjar = inventories.getCandyjar();
-
-
-        final long todayCount = pokemons.stream().filter(this::isToday).count();
-        final long yesterdayCount = pokemons.stream().filter(this::isYesterday).count();
-
-        return html().with(
-                head().with(
-                        link().withRel("stylesheet").withHref("style.css"),
-                        script().withType("text/javascript").withSrc("http://code.jquery.com/jquery.min.js"),
-                        script().withType("text/javascript").withSrc("app-scripts.js")
-                ),
-                body().with(
-                        h1(username).attr("align", "center"),
-                        h1("Pokemons " + pokemons.size() + " (today: " + todayCount + "; yesterday: " + yesterdayCount + ")").attr("align", "center"),
-                        br(),
-                        div().attr("style", "text-align:center").with(
-                                input().withType("button").withValue("Enable actions").attr("onClick", "enableActions()")
-                        ),
-                        br(),
-                        br(),
-                        table().attr("style", "margin-left: auto; margin-right: auto;").with(
-                                generatePokemonRows(pokemons, candyjar, refreshToken)
-                        )
-                )
-        ).render();
     }
 
     @RequestMapping(method = RequestMethod.GET, value = "pokemon-list-json")
@@ -121,7 +74,7 @@ public class Endpoint {
         List<PokemonClassData> pokemonClassDatas = new ArrayList<>();
 
         for (PokemonIdOuterClass.PokemonId pokemonId : PokemonIdOuterClass.PokemonId.values()) {
-            if (pokemonsById.containsKey(pokemonId)){
+            if (pokemonsById.containsKey(pokemonId)) {
                 final PokemonClassData pokemonClassData = generatePokemonClassData(pokemonId, pokemonsById.get(pokemonId), candyjar, playerLevel);
                 pokemonClassDatas.add(pokemonClassData);
             }
@@ -132,66 +85,8 @@ public class Endpoint {
         return data;
     }
 
-    private PokemonClassData generatePokemonClassData(PokemonIdOuterClass.PokemonId pokemonClassId, List<Pokemon> pokemons, CandyJar candyjar, int playerLevel) {
-
-        final PokemonMeta pokemonMeta = PokemonMetaRegistry.getMeta(pokemonClassId);
-        final int totalCandies = candyjar.getCandies(pokemonMeta.getFamily());
-        final int candyToEvolve = pokemonMeta.getCandyToEvolve();
-
-        final PokemonClassData pokemonClassData = new PokemonClassData();
-        pokemonClassData.setPokemonClassId(pokemonClassId);
-        pokemonClassData.setTotalCandies(totalCandies);
-        pokemonClassData.setCandyToEvole(candyToEvolve);
-        pokemonClassData.setPokemonClassImage(imageFor(pokemonClassId.getNumber()));
-
-        pokemonClassData.setBaseAttack(pokemonMeta.getBaseAttack());
-        pokemonClassData.setBaseDefence(pokemonMeta.getBaseDefense());
-        pokemonClassData.setBaseStamina(pokemonMeta.getBaseStamina());
-
-        final List<PokemonData> pokemonDatas = pokemons.
-                stream().
-                map(pokemon -> {
-                    final PokemonData pokemonData = new PokemonData();
-
-                    pokemonData.setPokemonId("" + pokemon.getId());
-                    pokemonData.setCp(pokemon.getCp());
-                    pokemonData.setHp(pokemon.getMaxStamina());
-                    pokemonData.setLevel(pokemon.getLevel());
-
-                    pokemonData.setIndividualAttack(pokemon.getIndividualAttack());
-                    pokemonData.setIndividualDefence(pokemon.getIndividualDefense());
-                    pokemonData.setIndividualStamina(pokemon.getIndividualStamina());
-
-                    pokemonData.setAttack(pokemon.getIndividualAttack() + pokemonMeta.getBaseAttack());
-                    pokemonData.setDefence(pokemon.getIndividualDefense() + pokemonMeta.getBaseDefense());
-                    pokemonData.setStamina(pokemon.getIndividualStamina() + pokemonMeta.getBaseStamina());
-
-                    pokemonData.setFavorite(pokemon.isFavorite());
-
-                    final String maxCpForPlayer = getCpForLastEvolution(pokemonData.getIndividualAttack(), pokemon.getIndividualDefense(), pokemonData.getIndividualStamina(), pokemonClassId, playerLevel);
-                    pokemonData.setMaxCpForYourLevel(maxCpForPlayer);
-
-                    final String maxCp = getCpForLastEvolution(pokemonData.getIndividualAttack(), pokemon.getIndividualDefense(), pokemonData.getIndividualStamina(), pokemonClassId, 40);
-                    pokemonData.setMaxCpForMaxLevel(maxCp);
-
-                    pokemonData.setRemindingDustForYourLevel(getRemindingDust(pokemon.getLevel(), Math.min(40f, playerLevel + 1.5f)));
-                    pokemonData.setRemindingDustForMaxLevel(getRemindingDust(pokemon.getLevel(), 40));
-
-                    pokemonData.setRemindingCandiesForYourLevel(getRemindingCandies(pokemon.getLevel(), Math.min(40f, playerLevel + 1.5f)));
-                    pokemonData.setRemindingCandiesForMaxLevel(getRemindingCandies(pokemon.getLevel(), 40));
-
-                    pokemonData.setCreationTimeMs(pokemon.getCreationTimeMs());
-
-                    return pokemonData;
-                }).
-                collect(Collectors.toList());
-
-        pokemonClassData.setPokemons(pokemonDatas);
-        return pokemonClassData;
-    }
-
     @RequestMapping(method = RequestMethod.GET, value = "evolve")
-    public HttpResult evolve(@RequestParam("pokemonId") long pokemonId, @RequestParam(value = "refreshToken") String refreshToken) {
+    public EvolveResult evolve(@RequestParam("pokemonId") long pokemonId, @RequestParam("playerLevel") int playerLevel, @RequestParam(value = "refreshToken") String refreshToken) {
         try {
             PokemonGo go = new PokemonGo(new GoogleUserCredentialProvider(httpClient, refreshToken), httpClient);
 
@@ -207,22 +102,22 @@ public class Endpoint {
                     EvolvePokemonResponseOuterClass.EvolvePokemonResponse.parseFrom(serverRequest.getData());
 
             if (response.getResult() == EvolvePokemonResponseOuterClass.EvolvePokemonResponse.Result.SUCCESS) {
-                String message = "Pokemon successfully evolved.\n" +
-                        "New pokemon: " + response.getEvolvedPokemonData().getPokemonId().name() + ";\n" +
-                        "Experience awarded: " + response.getExperienceAwarded() + ";\n" +
-                        "Candy awarded: " + response.getCandyAwarded();
-                return new HttpResult(true, message);
+                return EvolveResult.success(
+                        response.getCandyAwarded(),
+                        response.getEvolvedPokemonData().getPokemonId().name(),
+                        convertToPokemonData(response.getEvolvedPokemonData(), playerLevel)
+                        );
             } else {
-                return new HttpResult(false, "Can not evolve pokemon because of " + response.getResult());
+                return EvolveResult.failed("Can not evolve pokemon because of " + response.getResult());
             }
         } catch (Exception e) {
-            e.printStackTrace();
-            return new HttpResult(false, "Can not evolve pokemon because of " + e.getMessage());
+            logger.error(e.getMessage(), e);
+            return EvolveResult.failed("Can not evolve pokemon because of " + e.getMessage());
         }
     }
 
     @RequestMapping(method = RequestMethod.GET, value = "transfer")
-    public HttpResult transfer(@RequestParam("pokemonId") long pokemonId, @RequestParam(value = "refreshToken") String refreshToken) {
+    public TransferResult transfer(@RequestParam("pokemonId") long pokemonId, @RequestParam(value = "refreshToken") String refreshToken) {
         try {
             PokemonGo go = new PokemonGo(new GoogleUserCredentialProvider(httpClient, refreshToken), httpClient);
             ReleasePokemonMessageOuterClass.ReleasePokemonMessage reqMsg =
@@ -236,21 +131,21 @@ public class Endpoint {
             ReleasePokemonResponseOuterClass.ReleasePokemonResponse response;
             response = ReleasePokemonResponseOuterClass.ReleasePokemonResponse.parseFrom(serverRequest.getData());
 
+            response.getCandyAwarded();
+
             if (response.getResult() == ReleasePokemonResponseOuterClass.ReleasePokemonResponse.Result.SUCCESS) {
-                return new HttpResult(true,
-                        "Pokemon successfully transferred.\n" +
-                                "Candy awarded: " + response.getCandyAwarded());
+                return TransferResult.success(response.getCandyAwarded());
             } else {
-                return new HttpResult(false, "Can not transfer pokemon because of " + response.getResult());
+                return TransferResult.failed("Can not transfer pokemon because of " + response.getResult());
             }
         } catch (Exception e) {
             e.printStackTrace();
-            return new HttpResult(false, "Can not transfer pokemon because of " + e.getMessage());
+            return TransferResult.failed("Can not transfer pokemon because of " + e.getMessage());
         }
     }
 
     @RequestMapping(method = RequestMethod.GET, value = "favoritize")
-    public HttpResult favoritize(@RequestParam("pokemonId") long pokemonId, @RequestParam(value = "favorite") boolean favorite, @RequestParam(value = "refreshToken") String refreshToken) {
+    public FavoritizeResult favoritize(@RequestParam("pokemonId") long pokemonId, @RequestParam(value = "favorite") boolean favorite, @RequestParam(value = "refreshToken") String refreshToken) {
         try {
             PokemonGo go = new PokemonGo(new GoogleUserCredentialProvider(httpClient, refreshToken), httpClient);
             SetFavoritePokemonMessageOuterClass.SetFavoritePokemonMessage reqMsg = SetFavoritePokemonMessageOuterClass.SetFavoritePokemonMessage.newBuilder()
@@ -269,14 +164,80 @@ public class Endpoint {
             }
 
             if (response.getResult() == SUCCESS) {
-                return new HttpResult(true, "Pokemon is " + (favorite ? "" : "non") + "favorite");
+                return FavoritizeResult.success();
             } else {
-                return new HttpResult(false, "Can not change favorite because if " + response.getResult());
+                return FavoritizeResult.failed("Can not change favorite because if " + response.getResult());
             }
         } catch (Exception e) {
-            e.printStackTrace();
-            return new HttpResult(false, "Can not favoritize pokemon because of " + e.getMessage());
+            logger.error(e.getMessage(), e);
+            return FavoritizeResult.failed("Can not favoritize pokemon because of " + e.getMessage());
         }
+    }
+
+    private PokemonClassData generatePokemonClassData(PokemonIdOuterClass.PokemonId pokemonClassId, List<Pokemon> pokemons, CandyJar candyjar, int playerLevel) {
+
+        final PokemonMeta pokemonMeta = PokemonMetaRegistry.getMeta(pokemonClassId);
+        final int totalCandies = candyjar.getCandies(pokemonMeta.getFamily());
+        final int candyToEvolve = pokemonMeta.getCandyToEvolve();
+
+        final PokemonClassData pokemonClassData = new PokemonClassData();
+        pokemonClassData.setPokemonClassId(pokemonClassId.name());
+        pokemonClassData.setPokemonFamilyId(pokemonMeta.getFamily().name());
+        pokemonClassData.setTotalCandies(totalCandies);
+        pokemonClassData.setCandyToEvole(candyToEvolve);
+        pokemonClassData.setPokemonClassImage(imageFor(pokemonClassId.getNumber()));
+
+        pokemonClassData.setBaseAttack(pokemonMeta.getBaseAttack());
+        pokemonClassData.setBaseDefence(pokemonMeta.getBaseDefense());
+        pokemonClassData.setBaseStamina(pokemonMeta.getBaseStamina());
+
+        final List<PokemonData> pokemonDatas = pokemons.
+                stream().
+                map(pokemon -> convertToPokemonData(pokemon.getProto(), playerLevel)).
+                collect(Collectors.toList());
+
+        pokemonClassData.setPokemons(pokemonDatas);
+        return pokemonClassData;
+    }
+
+    private PokemonData convertToPokemonData(PokemonDataOuterClass.PokemonData pokemon, int playerLevel) {
+        final PokemonData pokemonData = new PokemonData();
+
+        final PokemonIdOuterClass.PokemonId pokemonClassId = pokemon.getPokemonId();
+        PokemonMeta pokemonMeta = PokemonMetaRegistry.getMeta(pokemonClassId);
+
+        pokemonData.setPokemonId("" + pokemon.getId());
+        pokemonData.setCp(pokemon.getCp());
+        pokemonData.setHp(pokemon.getStaminaMax());
+
+        final float level = PokemonCpUtils.getLevelFromCpMultiplier(pokemon.getCpMultiplier() + pokemon.getAdditionalCpMultiplier());
+        pokemonData.setLevel(level);
+
+        pokemonData.setIndividualAttack(pokemon.getIndividualAttack());
+        pokemonData.setIndividualDefence(pokemon.getIndividualDefense());
+        pokemonData.setIndividualStamina(pokemon.getIndividualStamina());
+
+        pokemonData.setAttack(pokemon.getIndividualAttack() + pokemonMeta.getBaseAttack());
+        pokemonData.setDefence(pokemon.getIndividualDefense() + pokemonMeta.getBaseDefense());
+        pokemonData.setStamina(pokemon.getIndividualStamina() + pokemonMeta.getBaseStamina());
+
+        pokemonData.setFavorite(pokemon.getFavorite() > 0);
+
+        final String maxCpForPlayer = getCpForLastEvolution(pokemonData.getIndividualAttack(), pokemon.getIndividualDefense(), pokemonData.getIndividualStamina(), pokemonClassId, playerLevel);
+        pokemonData.setMaxCpForYourLevel(maxCpForPlayer);
+
+        final String maxCp = getCpForLastEvolution(pokemonData.getIndividualAttack(), pokemon.getIndividualDefense(), pokemonData.getIndividualStamina(), pokemonClassId, 40);
+        pokemonData.setMaxCpForMaxLevel(maxCp);
+
+        pokemonData.setRemindingDustForYourLevel(getRemindingDust(level, Math.min(40f, playerLevel + 1.5f)));
+        pokemonData.setRemindingDustForMaxLevel(getRemindingDust(level, 40));
+
+        pokemonData.setRemindingCandiesForYourLevel(getRemindingCandies(level, Math.min(40f, playerLevel + 1.5f)));
+        pokemonData.setRemindingCandiesForMaxLevel(getRemindingCandies(level, 40));
+
+        pokemonData.setCreationTimeMs(pokemon.getCreationTimeMs());
+
+        return pokemonData;
     }
 
     private String getCpForLastEvolution(int individualAttack, int individualDefense, int individualStamina, PokemonIdOuterClass.PokemonId pokemonId, int playerLevel) {
@@ -304,131 +265,6 @@ public class Endpoint {
                 playerLevel);
     }
 
-    private ContainerTag generateHeader() {
-        return tr().with(
-                th(),
-                th("cp"),
-                th("hp"),
-                th("level"),
-                th("attack"),
-                th("defence"),
-                th("stamina"),
-                th("norm cp"),
-                th("remaining dust"),
-                th()
-        );
-    }
-
-    private List<Tag> generatePokemonRows(List<Pokemon> pokemons, CandyJar candyjar, String refreshToken) {
-        final Map<PokemonIdOuterClass.PokemonId, List<Pokemon>> pokemonsById = groupPokemons(pokemons);
-
-        List<Tag> result = new ArrayList<>();
-
-        Arrays.stream(PokemonIdOuterClass.PokemonId.values())
-                .filter(pokemonsById::containsKey)
-                .forEachOrdered(
-                        pokemonId -> {
-                            final PokemonMeta pokemonMeta = PokemonMetaRegistry.getMeta(pokemonId);
-                            final int totalCandies = candyjar.getCandies(pokemonMeta.getFamily());
-                            final int candyToEvolve = pokemonMeta.getCandyToEvolve();
-                            final boolean evolutionAvailable = candyToEvolve != 0;
-                            final int availableEvolutionCount;
-                            final int elapsedCandiesAfterAllEvol;
-                            final String evolutionString;
-
-                            if (evolutionAvailable) {
-                                availableEvolutionCount = totalCandies / candyToEvolve;
-                                elapsedCandiesAfterAllEvol = totalCandies % candyToEvolve;
-                                evolutionString = "(" + totalCandies + " == " + availableEvolutionCount + " evolutions and " + elapsedCandiesAfterAllEvol + " will left)";
-                            } else {
-                                evolutionString = "(no evolution)";
-                                availableEvolutionCount = 0;
-                                elapsedCandiesAfterAllEvol = 0;
-                            }
-
-
-                            result.add(
-                                    tr().with(
-                                            td().attr("colspan", "14").with(
-                                                    img().withSrc("/sprites/" + imageFor(pokemonId.getNumber())).attr("width", "32px").attr("height", "32px"),
-                                                    text(pokemonId.name() + " " + evolutionString + " absMaxCp: " + getAbsoluteMaxCp(pokemonId))
-                                            )
-                                    )
-                            );
-
-                            result.add(generateHeader());
-
-                            final List<Pokemon> pokemonsOfType = pokemonsById.get(pokemonId);
-                            for (int i = 0; i < pokemonsOfType.size(); i++) {
-                                final Pokemon pokemon = pokemonsOfType.get(i);
-
-                                final boolean isSuperFresh = isToday(pokemon);
-                                final boolean isFresh = isYesterday(pokemon);
-
-                                final String freshImage;
-                                if (isSuperFresh) {
-                                    freshImage = "new_green.png";
-                                } else if (isFresh) {
-                                    freshImage = "new_red.png";
-                                } else {
-                                    freshImage = "blank.png";
-                                }
-
-                                boolean isCool = pokemon.getIndividualAttack() >= 14 && pokemon.getIndividualDefense() >= 14 && pokemon.getIndividualStamina() >= 14;
-                                String coolBg = isCool ? "yellow" : "transparent";
-
-                                final String favoriteImage;
-                                if (pokemon.isFavorite()) {
-                                    favoriteImage = "favorite.png";
-                                } else {
-                                    favoriteImage = "non-favorite.png";
-                                }
-
-                                ZonedDateTime creationDateTime = ZonedDateTime.ofInstant(Instant.ofEpochMilli(pokemon.getCreationTimeMs()), ZoneId.of(TIME_ZONE_MOSCOW.getID()));
-
-                                final String creationTimeString = creationDateTime.toString();
-
-                                final boolean candidateForEvolve = i < availableEvolutionCount;
-                                result.add(
-                                        tr().with(
-                                                td().with(
-                                                        img().withSrc("/sprites/" + favoriteImage).
-                                                                attr("width", "16px").attr("height", "16px")
-                                                                .attr("onClick",
-                                                                        "setFavorite(this, \":pokemonId\", :favorite, \":refreshToken\")".
-                                                                                replace(":pokemonId", "" + pokemon.getId()).
-                                                                                replace(":favorite", "" + !pokemon.isFavorite()).
-                                                                                replace(":refreshToken", refreshToken))
-                                                ),
-                                                td("" + pokemon.getCp()),
-                                                td("" + pokemon.getStamina()),
-                                                td("" + pokemon.getLevel()),
-                                                td("" + pokemon.getIndividualAttack()).attr("bgcolor", coolBg),
-                                                td("" + pokemon.getIndividualDefense()).attr("bgcolor", coolBg),
-                                                td("" + pokemon.getIndividualStamina()).attr("bgcolor", coolBg),
-                                                td("" + getNormalizedMaxCp(pokemon)),
-                                                td("" + getRemindingDust(pokemon.getLevel(), 22)),
-                                                td(" ").attr("bgcolor", !candidateForEvolve ? "green" : "transparent"),
-                                                td().with(
-                                                        createTransferButton(pokemon.getId(), pokemon.isFavorite(), refreshToken)
-                                                ),
-
-                                                td(" ").attr("bgcolor", candidateForEvolve ? "green" : "transparent"),
-                                                td().with(
-                                                        createEvolveButton(pokemon.getId(), refreshToken)
-                                                ),
-                                                td().with(
-                                                        img().withSrc("/sprites/" + freshImage).attr("width", "16px").attr("height", "16px").attr("title", creationTimeString)
-                                                )
-                                        )
-                                );
-                            }
-                        }
-                );
-
-        return result;
-    }
-
     private Map<PokemonIdOuterClass.PokemonId, List<Pokemon>> groupPokemons(List<Pokemon> pokemons) {
         return pokemons.stream().collect(Collectors.toMap(
                 PokemonDetails::getPokemonId,
@@ -440,18 +276,6 @@ public class Endpoint {
                                 sorted((p1, p2) -> -(p1.getCp() - p2.getCp())).
                                 collect(Collectors.toList())
         ));
-    }
-
-    private boolean isToday(Pokemon pokemon) {
-        return DateUtils.isSameDay(new Date(), new Date(pokemon.getCreationTimeMs()));
-    }
-
-    private boolean isYesterday(Pokemon pokemon) {
-        Date creationDate = new Date(pokemon.getCreationTimeMs());
-        final Calendar calendar = GregorianCalendar.getInstance(TIME_ZONE_MOSCOW);
-        calendar.setTime(new Date());
-        calendar.add(Calendar.DATE, -1);
-        return DateUtils.isSameDay(calendar.getTime(), creationDate);
     }
 
     private int getRemindingDust(float currentLevel, float maxLevel) {
@@ -544,67 +368,6 @@ public class Endpoint {
             return 3;
         }
         return 4;
-    }
-
-    private String getNormalizedMaxCp(Pokemon pokemon) {
-        final int individualAttack = pokemon.getIndividualAttack();
-        final int individualDefense = pokemon.getIndividualDefense();
-        final int individualStamina = pokemon.getIndividualStamina();
-        final PokemonFamilyIdOuterClass.PokemonFamilyId pokemonFamily = pokemon.getPokemonFamily();
-        if (pokemonFamily != PokemonFamilyIdOuterClass.PokemonFamilyId.FAMILY_EEVEE) {
-            final PokemonIdOuterClass.PokemonId highestForFamily = PokemonMetaRegistry.getHighestForFamily().get(pokemonFamily);
-            final int max = getNormalizedMaxCp(individualAttack, individualDefense, individualStamina, highestForFamily);
-            return "" + max;
-        } else {
-            return "V" + getNormalizedMaxCp(individualAttack, individualDefense, individualStamina, PokemonIdOuterClass.PokemonId.VAPOREON) +
-                    " / " +
-                    "J" + getNormalizedMaxCp(individualAttack, individualDefense, individualStamina, PokemonIdOuterClass.PokemonId.JOLTEON) +
-                    " / " +
-                    "F" + getNormalizedMaxCp(individualAttack, individualDefense, individualStamina, PokemonIdOuterClass.PokemonId.FLAREON);
-
-        }
-    }
-
-    private String getAbsoluteMaxCp(PokemonIdOuterClass.PokemonId pokemon) {
-        final int individualAttack = 15;
-        final int individualDefense = 15;
-        final int individualStamina = 15;
-        final PokemonFamilyIdOuterClass.PokemonFamilyId pokemonFamily = PokemonMetaRegistry.getMeta(pokemon).getFamily();
-        if (pokemonFamily != PokemonFamilyIdOuterClass.PokemonFamilyId.FAMILY_EEVEE) {
-            final PokemonIdOuterClass.PokemonId highestForFamily = PokemonMetaRegistry.getHighestForFamily().get(pokemonFamily);
-            final int max = getNormalizedMaxCp(individualAttack, individualDefense, individualStamina, highestForFamily);
-            return "" + max;
-        } else {
-            return "V" + getNormalizedMaxCp(individualAttack, individualDefense, individualStamina, PokemonIdOuterClass.PokemonId.VAPOREON) +
-                    " " +
-                    "J" + getNormalizedMaxCp(individualAttack, individualDefense, individualStamina, PokemonIdOuterClass.PokemonId.JOLTEON) +
-                    " " +
-                    "F" + getNormalizedMaxCp(individualAttack, individualDefense, individualStamina, PokemonIdOuterClass.PokemonId.FLAREON);
-
-        }
-    }
-
-    private int getNormalizedMaxCp(int individualAttack, int individualDefense, int individualStamina, PokemonIdOuterClass.PokemonId highestForFamily) {
-        final PokemonMeta highestPokemonMeta = PokemonMetaRegistry.getMeta(highestForFamily);
-        final int attack = individualAttack + highestPokemonMeta.getBaseAttack();
-        final int defense = individualDefense + highestPokemonMeta.getBaseDefense();
-        final int stamina = individualStamina + highestPokemonMeta.getBaseStamina();
-//        return (int) (attack * Math.pow(defense, 0.5) * Math.pow(stamina, 0.5) * Math.pow(0.79030001f, 2) / 10f);
-        return (int) (attack * Math.pow(defense, 0.5) * Math.pow(stamina, 0.5) * Math.pow(0.62656713f, 2) / 10f);
-    }
-
-    private EmptyTag createEvolveButton(long id, String refreshToken) {
-        return input().withType("button").withValue("Evolve").attr("disabled", "disabled").attr("onClick", "evolvePokemon(this, \"" + id + "\", \"" + refreshToken + "\")");
-    }
-
-    private EmptyTag createTransferButton(long id, boolean isFavorite, String refreshToken) {
-        final String onClick;
-        if (isFavorite) {
-            onClick = "alert('This pokemon was marked as favorite. To transfer remove favorite mark and refresh this page')";
-        } else {
-            onClick = "transferPokemon(this, ':id', ':refreshToken')".replace(":id", "" + id).replace(":refreshToken", refreshToken);
-        }
-        return input().withType("button").withValue("Transfer").attr("disabled", "disabled").attr("onClick", onClick);
     }
 
     private String imageFor(int pokemonIdNumber) {

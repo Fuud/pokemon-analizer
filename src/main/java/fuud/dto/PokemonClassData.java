@@ -5,7 +5,8 @@ import POGOProtos.Enums.PokemonIdOuterClass;
 import java.util.List;
 
 public class PokemonClassData {
-    private PokemonIdOuterClass.PokemonId pokemonClassId;
+    private String pokemonClassId;
+    private String pokemonFamilyId;
     private List<PokemonData> pokemons;
     private int totalCandies;
     private int candyToEvole;
@@ -15,11 +16,11 @@ public class PokemonClassData {
     private int baseDefence;
     private int baseStamina;
 
-    public void setPokemonClassId(PokemonIdOuterClass.PokemonId pokemonClassId) {
+    public void setPokemonClassId(String pokemonClassId) {
         this.pokemonClassId = pokemonClassId;
     }
 
-    public PokemonIdOuterClass.PokemonId getPokemonClassId() {
+    public String getPokemonClassId() {
         return pokemonClassId;
     }
 
@@ -78,5 +79,13 @@ public class PokemonClassData {
 
     public int getBaseStamina() {
         return baseStamina;
+    }
+
+    public String getPokemonFamilyId() {
+        return pokemonFamilyId;
+    }
+
+    public void setPokemonFamilyId(String pokemonFamilyId) {
+        this.pokemonFamilyId = pokemonFamilyId;
     }
 }

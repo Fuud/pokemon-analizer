@@ -1,5 +1,7 @@
 package fuud.dto;
 
+import java.util.Random;
+
 public class PokemonData {
     private int cp;
     private int hp;
@@ -19,6 +21,21 @@ public class PokemonData {
     private int remindingCandiesForYourLevel;
     private int remindingCandiesForMaxLevel;
     private long creationTimeMs;
+
+    public PokemonData() {
+    }
+
+    // for testing
+    public PokemonData(int cp, int hp, float level, int individualAttack, int individualDefence, int individualStamina) {
+        this.cp = cp;
+        this.hp = hp;
+        this.level = level;
+        this.individualAttack = individualAttack;
+        this.individualDefence = individualDefence;
+        this.individualStamina = individualStamina;
+        this.pokemonId = "" +new Random().nextLong();
+        this.creationTimeMs = System.currentTimeMillis();
+    }
 
     public void setCp(int cp) {
         this.cp = cp;
