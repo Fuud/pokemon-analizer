@@ -11,4 +11,25 @@ th {
 td {
     border: 1px solid;
     padding: 2px;
+    text-align: center;
+}
+
+.row_separator {
+    border-top: 3px solid;
+}
+
+.good_pokemon {
+    background-color: yellow;
+}
+
+.today {
+    background-color: #00f700;
+}
+
+.yesterday {
+    background-color: #ffa86c;
+}
+
+.highlight_button {
+    background-color: green;
 }

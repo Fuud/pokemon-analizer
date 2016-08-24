@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Pokemons List</title>
+
+    <script type="text/javascript" src="angular.js"></script>
+    <script type="text/javascript" src="moment.js"></script>
+    <script type="text/javascript" src="pokemons.js"></script>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body ng-app="pokemons">
+
+<div ng-controller="pokemonsController">
+    <h1 align="center">{{pokemon_data.userName}}</h1>
+    <h1 align="center">Pokemons: {{pokemonCount()}} (today: {{todayPokemonCount()}}, yesterday:
+        {{yesterdayPokemonCount()}})</h1>
+    <div style="text-align: center">
+        <input type="button" value="{{actionsDisabled ? 'Enable actions' : 'Disable actions'}}" ng-click="actionsDisabled = !actionsDisabled">
+    </div>
+    <br>
+    <br>
+
+    <table style="margin-left: auto; margin-right: auto">
+
+        <tr ng-repeat-start="pokemonClass in pokemon_data.pokemonsByClass track by pokemonClass.pokemonClassId">
+            <td colspan="18">
+                <img src="sprites/{{pokemonClass.pokemonClassImage}}" height="32" width="32">
+                {{pokemonClass.pokemonClassId}}
+                (
+                {{pokemonClass.totalCandies}} candies
+                <span ng-if="evolvable(pokemonClass)"> == {{evolutionCount(pokemonClass)}} evolutions and {{candiesLeft(pokemonClass)}} will left
+                </span>
+                )
+            </td>
+        </tr>
+
+        <tr>
+            <th rowspan="2"></th>
+            <th rowspan="2">cp</th>
+            <th rowspan="2">hp</th>
+            <th rowspan="2">level</th>
+            <th rowspan="1" colspan="3">individual</th>
+            <!--<th>"attack"</th>-->
+            <!--<th>"defence"</th>-->
+            <!--<th>"stamina"</th>-->
+            <th rowspan="1" colspan="3">for your level</th>
+            <th rowspan="1" colspan="3">for 40 level</th>
+            <th rowspan="2">date</th>
+            <th rowspan="2" colspan="4"></th>
+        </tr>
+
+        <tr>
+            <th>attack</th> <!--individual-->
+            <th>defence</th>
+            <th>stamina</th>
+
+            <th>max cp</th> <!--for your level-->
+            <th>dust</th>
+            <th>candies</th>
+
+            <th>max cp</th> <!--for 40 level-->
+            <th>dust</th>
+            <th>candies</th>
+
+        </tr>
+
+        <tr ng-repeat-end
+            ng-repeat="pokemon in pokemonClass.pokemons track by pokemon.pokemonId"
+            ng-class="{row_separator: $index % 5 == 0 && $index != 0}">
+            <td><img src="sprites/{{pokemon.favorite?'favorite.png':'non-favorite.png'}}" width="16" height="16"/></td>
+            <td>{{pokemon.cp}}</td>
+            <td>{{pokemon.hp}}</td>
+            <td>{{pokemon.level}}</td>
+
+            <td ng-class="{good_pokemon : isGoodPokemon(pokemon)}">{{pokemon.individualAttack}}</td>
+            <td ng-class="{good_pokemon : isGoodPokemon(pokemon)}">{{pokemon.individualDefence}}</td>
+            <td ng-class="{good_pokemon : isGoodPokemon(pokemon)}">{{pokemon.individualStamina}}</td>
+
+            <td>{{pokemon.maxCpForYourLevel}}</td>
+            <td>{{pokemon.remindingDustForYourLevel}}</td>
+            <td>{{pokemon.remindingCandiesForYourLevel}}</td>
+
+            <td>{{pokemon.maxCpForMaxLevel}}</td>
+            <td>{{pokemon.remindingDustForMaxLevel}}</td>
+            <td>{{pokemon.remindingCandiesForMaxLevel}}</td>
+
+            <td ng-class="{today : isToday(pokemon.creationTimeMs), yesterday : isYesterday(pokemon.creationTimeMs)}">
+                {{pokemon.creationTimeMs | date : 'dd-MM HH:mm'}}
+            </td>
+
+
+            <td ng-class="{highlight_button: $index >= evolutionCount(pokemonClass)}"></td>
+            <td>
+                <input type="button" value="Transfer" ng-disabled="actionsDisabled">
+            </td>
+
+            <td ng-class="{highlight_button: $index < evolutionCount(pokemonClass)}"></td>
+            <td>
+                <input ng-if="evolvable(pokemonClass)" type="button" value="Evolve" ng-disabled="actionsDisabled">
+            </td>
+        </tr>
+
+
+    </table>
+
+</div>
+
+</body>

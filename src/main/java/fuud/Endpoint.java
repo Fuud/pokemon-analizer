@@ -1,5 +1,6 @@
 package fuud;
 
+import POGOProtos.Data.PlayerDataOuterClass;
 import POGOProtos.Enums.PokemonFamilyIdOuterClass;
 import POGOProtos.Enums.PokemonIdOuterClass;
 import POGOProtos.Networking.Requests.Messages.EvolvePokemonMessageOuterClass;
@@ -13,6 +14,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.pokegoapi.api.PokemonGo;
 import com.pokegoapi.api.inventory.CandyJar;
 import com.pokegoapi.api.inventory.Inventories;
+import com.pokegoapi.api.player.PlayerProfile;
 import com.pokegoapi.api.pokemon.Pokemon;
 import com.pokegoapi.api.pokemon.PokemonDetails;
 import com.pokegoapi.api.pokemon.PokemonMeta;
@@ -20,7 +22,11 @@ import com.pokegoapi.api.pokemon.PokemonMetaRegistry;
 import com.pokegoapi.auth.GoogleUserCredentialProvider;
 import com.pokegoapi.exceptions.RemoteServerException;
 import com.pokegoapi.main.ServerRequest;
+import fuud.copied.PokemonCpUtils;
 import fuud.dto.HttpResult;
+import fuud.dto.PokemonClassData;
+import fuud.dto.PokemonData;
+import fuud.dto.PokemonListData;
 import j2html.tags.ContainerTag;
 import j2html.tags.EmptyTag;
 import j2html.tags.Tag;
@@ -92,6 +98,96 @@ public class Endpoint {
                         )
                 )
         ).render();
+    }
+
+    @RequestMapping(method = RequestMethod.GET, value = "pokemon-list-json")
+    public PokemonListData pokemonListJson(@RequestParam(value = "refreshToken") String refreshToken) throws Exception {
+        PokemonGo go = new PokemonGo(new GoogleUserCredentialProvider(httpClient, refreshToken), httpClient);
+
+        final PlayerProfile playerProfile = go.getPlayerProfile();
+        final PlayerDataOuterClass.PlayerData playerData = playerProfile.getPlayerData();
+        final Inventories inventories = go.getInventories();
+        final List<Pokemon> pokemons = inventories.getPokebank().getPokemons();
+        final CandyJar candyjar = inventories.getCandyjar();
+        final int playerLevel = playerProfile.getStats().getLevel();
+
+        final PokemonListData data = new PokemonListData();
+
+        data.setUserName(playerData.getUsername());
+        data.setUserLevel(playerLevel);
+
+        final Map<PokemonIdOuterClass.PokemonId, List<Pokemon>> pokemonsById = groupPokemons(pokemons);
+
+        List<PokemonClassData> pokemonClassDatas = new ArrayList<>();
+
+        for (PokemonIdOuterClass.PokemonId pokemonId : PokemonIdOuterClass.PokemonId.values()) {
+            if (pokemonsById.containsKey(pokemonId)){
+                final PokemonClassData pokemonClassData = generatePokemonClassData(pokemonId, pokemonsById.get(pokemonId), candyjar, playerLevel);
+                pokemonClassDatas.add(pokemonClassData);
+            }
+        }
+
+        data.setPokemonsByClass(pokemonClassDatas);
+
+        return data;
+    }
+
+    private PokemonClassData generatePokemonClassData(PokemonIdOuterClass.PokemonId pokemonClassId, List<Pokemon> pokemons, CandyJar candyjar, int playerLevel) {
+
+        final PokemonMeta pokemonMeta = PokemonMetaRegistry.getMeta(pokemonClassId);
+        final int totalCandies = candyjar.getCandies(pokemonMeta.getFamily());
+        final int candyToEvolve = pokemonMeta.getCandyToEvolve();
+
+        final PokemonClassData pokemonClassData = new PokemonClassData();
+        pokemonClassData.setPokemonClassId(pokemonClassId);
+        pokemonClassData.setTotalCandies(totalCandies);
+        pokemonClassData.setCandyToEvole(candyToEvolve);
+        pokemonClassData.setPokemonClassImage(imageFor(pokemonClassId.getNumber()));
+
+        pokemonClassData.setBaseAttack(pokemonMeta.getBaseAttack());
+        pokemonClassData.setBaseDefence(pokemonMeta.getBaseDefense());
+        pokemonClassData.setBaseStamina(pokemonMeta.getBaseStamina());
+
+        final List<PokemonData> pokemonDatas = pokemons.
+                stream().
+                map(pokemon -> {
+                    final PokemonData pokemonData = new PokemonData();
+
+                    pokemonData.setPokemonId("" + pokemon.getId());
+                    pokemonData.setCp(pokemon.getCp());
+                    pokemonData.setHp(pokemon.getMaxStamina());
+                    pokemonData.setLevel(pokemon.getLevel());
+
+                    pokemonData.setIndividualAttack(pokemon.getIndividualAttack());
+                    pokemonData.setIndividualDefence(pokemon.getIndividualDefense());
+                    pokemonData.setIndividualStamina(pokemon.getIndividualStamina());
+
+                    pokemonData.setAttack(pokemon.getIndividualAttack() + pokemonMeta.getBaseAttack());
+                    pokemonData.setDefence(pokemon.getIndividualDefense() + pokemonMeta.getBaseDefense());
+                    pokemonData.setStamina(pokemon.getIndividualStamina() + pokemonMeta.getBaseStamina());
+
+                    pokemonData.setFavorite(pokemon.isFavorite());
+
+                    final String maxCpForPlayer = getCpForLastEvolution(pokemonData.getIndividualAttack(), pokemon.getIndividualDefense(), pokemonData.getIndividualStamina(), pokemonClassId, playerLevel);
+                    pokemonData.setMaxCpForYourLevel(maxCpForPlayer);
+
+                    final String maxCp = getCpForLastEvolution(pokemonData.getIndividualAttack(), pokemon.getIndividualDefense(), pokemonData.getIndividualStamina(), pokemonClassId, 40);
+                    pokemonData.setMaxCpForMaxLevel(maxCp);
+
+                    pokemonData.setRemindingDustForYourLevel(getRemindingDust(pokemon.getLevel(), Math.min(40f, playerLevel + 1.5f)));
+                    pokemonData.setRemindingDustForMaxLevel(getRemindingDust(pokemon.getLevel(), 40));
+
+                    pokemonData.setRemindingCandiesForYourLevel(getRemindingCandies(pokemon.getLevel(), Math.min(40f, playerLevel + 1.5f)));
+                    pokemonData.setRemindingCandiesForMaxLevel(getRemindingCandies(pokemon.getLevel(), 40));
+
+                    pokemonData.setCreationTimeMs(pokemon.getCreationTimeMs());
+
+                    return pokemonData;
+                }).
+                collect(Collectors.toList());
+
+        pokemonClassData.setPokemons(pokemonDatas);
+        return pokemonClassData;
     }
 
     @RequestMapping(method = RequestMethod.GET, value = "evolve")
@@ -183,6 +279,31 @@ public class Endpoint {
         }
     }
 
+    private String getCpForLastEvolution(int individualAttack, int individualDefense, int individualStamina, PokemonIdOuterClass.PokemonId pokemonId, int playerLevel) {
+        final PokemonFamilyIdOuterClass.PokemonFamilyId pokemonFamily = PokemonMetaRegistry.getMeta(pokemonId).getFamily();
+
+        if (pokemonFamily != PokemonFamilyIdOuterClass.PokemonFamilyId.FAMILY_EEVEE) {
+            final PokemonIdOuterClass.PokemonId highestForFamily = PokemonMetaRegistry.getHighestForFamily().get(pokemonFamily);
+            return "" + getCp(individualAttack, individualDefense, individualStamina, playerLevel, highestForFamily);
+        } else {
+            return "V" + getCp(individualAttack, individualDefense, individualStamina, playerLevel, PokemonIdOuterClass.PokemonId.VAPOREON) +
+                    " " +
+                    "J" + getCp(individualAttack, individualDefense, individualStamina, playerLevel, PokemonIdOuterClass.PokemonId.JOLTEON) +
+                    " " +
+                    "F" + getCp(individualAttack, individualDefense, individualStamina, playerLevel, PokemonIdOuterClass.PokemonId.FLAREON);
+
+        }
+    }
+
+    private int getCp(int individualAttack, int individualDefence, int individualStamina, int playerLevel, PokemonIdOuterClass.PokemonId pokemonId) {
+        final PokemonMeta pokemonMeta = PokemonMetaRegistry.getMeta(pokemonId);
+        return PokemonCpUtils.getMaxCpForPlayer(
+                pokemonMeta.getBaseAttack() + individualAttack,
+                pokemonMeta.getBaseDefense() + individualDefence,
+                pokemonMeta.getBaseStamina() + individualStamina,
+                playerLevel);
+    }
+
     private ContainerTag generateHeader() {
         return tr().with(
                 th(),
@@ -199,16 +320,7 @@ public class Endpoint {
     }
 
     private List<Tag> generatePokemonRows(List<Pokemon> pokemons, CandyJar candyjar, String refreshToken) {
-        final Map<PokemonIdOuterClass.PokemonId, List<Pokemon>> pokemonsById = pokemons.stream().collect(Collectors.toMap(
-                PokemonDetails::getPokemonId,
-                Collections::singletonList,
-                (pokemonsLeft, pokemonsRight) ->
-                        Stream.
-                                of(pokemonsLeft, pokemonsRight).
-                                flatMap(Collection::stream).
-                                sorted((p1, p2) -> -(p1.getCp() - p2.getCp())).
-                                collect(Collectors.toList())
-        ));
+        final Map<PokemonIdOuterClass.PokemonId, List<Pokemon>> pokemonsById = groupPokemons(pokemons);
 
         List<Tag> result = new ArrayList<>();
 
@@ -295,7 +407,7 @@ public class Endpoint {
                                                 td("" + pokemon.getIndividualDefense()).attr("bgcolor", coolBg),
                                                 td("" + pokemon.getIndividualStamina()).attr("bgcolor", coolBg),
                                                 td("" + getNormalizedMaxCp(pokemon)),
-                                                td("" + getRemindingDust(pokemon.getLevel())),
+                                                td("" + getRemindingDust(pokemon.getLevel(), 22)),
                                                 td(" ").attr("bgcolor", !candidateForEvolve ? "green" : "transparent"),
                                                 td().with(
                                                         createTransferButton(pokemon.getId(), pokemon.isFavorite(), refreshToken)
@@ -317,6 +429,19 @@ public class Endpoint {
         return result;
     }
 
+    private Map<PokemonIdOuterClass.PokemonId, List<Pokemon>> groupPokemons(List<Pokemon> pokemons) {
+        return pokemons.stream().collect(Collectors.toMap(
+                PokemonDetails::getPokemonId,
+                Collections::singletonList,
+                (pokemonsLeft, pokemonsRight) ->
+                        Stream.
+                                of(pokemonsLeft, pokemonsRight).
+                                flatMap(Collection::stream).
+                                sorted((p1, p2) -> -(p1.getCp() - p2.getCp())).
+                                collect(Collectors.toList())
+        ));
+    }
+
     private boolean isToday(Pokemon pokemon) {
         return DateUtils.isSameDay(new Date(), new Date(pokemon.getCreationTimeMs()));
     }
@@ -329,10 +454,18 @@ public class Endpoint {
         return DateUtils.isSameDay(calendar.getTime(), creationDate);
     }
 
-    private int getRemindingDust(float level) {
+    private int getRemindingDust(float currentLevel, float maxLevel) {
         int sum = 0;
-        for (; level < 22; level += 0.5) {
-            sum += getStartdustCostsForPowerup(level);
+        for (; currentLevel < maxLevel; currentLevel += 0.5) {
+            sum += getStartdustCostsForPowerup(currentLevel);
+        }
+        return sum;
+    }
+
+    private int getRemindingCandies(float currentLevel, float maxLevel) {
+        int sum = 0;
+        for (; currentLevel < maxLevel; currentLevel += 0.5) {
+            sum += getCandyCostsForPowerup(currentLevel);
         }
         return sum;
     }
@@ -398,6 +531,19 @@ public class Endpoint {
             return 9000;
         }
         return 10000;
+    }
+
+    public static int getCandyCostsForPowerup(float level) {
+        if (level < 13) {
+            return 1;
+        }
+        if (level < 21) {
+            return 2;
+        }
+        if (level < 31) {
+            return 3;
+        }
+        return 4;
     }
 
     private String getNormalizedMaxCp(Pokemon pokemon) {
