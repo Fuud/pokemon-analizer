@@ -4,30 +4,29 @@ import POGOProtos.Data.PlayerDataOuterClass;
 import POGOProtos.Data.PokemonDataOuterClass;
 import POGOProtos.Enums.PokemonFamilyIdOuterClass;
 import POGOProtos.Enums.PokemonIdOuterClass;
-import POGOProtos.Networking.Requests.Messages.EvolvePokemonMessageOuterClass;
-import POGOProtos.Networking.Requests.Messages.ReleasePokemonMessageOuterClass;
-import POGOProtos.Networking.Requests.Messages.SetFavoritePokemonMessageOuterClass;
+import POGOProtos.Inventory.InventoryItemDataOuterClass;
+import POGOProtos.Inventory.InventoryItemOuterClass;
+import POGOProtos.Inventory.Item.ItemDataOuterClass;
+import POGOProtos.Inventory.Item.ItemIdOuterClass;
+import POGOProtos.Networking.Requests.Messages.*;
 import POGOProtos.Networking.Requests.RequestTypeOuterClass;
-import POGOProtos.Networking.Responses.EvolvePokemonResponseOuterClass;
-import POGOProtos.Networking.Responses.ReleasePokemonResponseOuterClass;
-import POGOProtos.Networking.Responses.SetFavoritePokemonResponseOuterClass;
+import POGOProtos.Networking.Responses.*;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.pokegoapi.api.PokemonGo;
-import com.pokegoapi.api.inventory.CandyJar;
-import com.pokegoapi.api.inventory.Inventories;
-import com.pokegoapi.api.player.PlayerProfile;
-import com.pokegoapi.api.pokemon.Pokemon;
-import com.pokegoapi.api.pokemon.PokemonDetails;
-import com.pokegoapi.api.pokemon.PokemonMeta;
-import com.pokegoapi.api.pokemon.PokemonMetaRegistry;
-import com.pokegoapi.auth.GoogleUserCredentialProvider;
+import com.pokegoapi.api.inventory.*;
+import com.pokegoapi.api.pokemon.*;
+import com.pokegoapi.exceptions.LoginFailedException;
 import com.pokegoapi.exceptions.RemoteServerException;
 import com.pokegoapi.main.ServerRequest;
+import fuud.copied.GoogleUserCredentialProvider;
 import fuud.copied.PokemonCpUtils;
+import fuud.copied.RequestHandler;
 import fuud.dto.*;
+import fuud.dto.Inventories;
 import okhttp3.OkHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -43,12 +42,21 @@ import static POGOProtos.Networking.Responses.SetFavoritePokemonResponseOuterCla
 @RestController
 public class Endpoint {
     private static final Logger logger = LoggerFactory.getLogger(Endpoint.class);
-    private final OkHttpClient httpClient = new OkHttpClient();
+    private final OkHttpClient httpClient;
+    private final CredentialProviderHolder credentialProviderHolder;
+    private final RequestHandlerHolder requestHandlerHolder;
+
+    @Autowired
+    public Endpoint(OkHttpClient httpClient, CredentialProviderHolder credentialProviderHolder, RequestHandlerHolder requestHandlerHolder) {
+        this.httpClient = httpClient;
+        this.credentialProviderHolder = credentialProviderHolder;
+        this.requestHandlerHolder = requestHandlerHolder;
+    }
+
 
     @RequestMapping(method = RequestMethod.GET, value = "get-refresh-token")
-    public RedirectView getRefreshToken(@RequestParam(value = "token") String token) throws Exception {
-        final GoogleUserCredentialProvider provider = new GoogleUserCredentialProvider(httpClient);
-        provider.login(token);
+    public RedirectView getRefreshToken(@RequestParam(value = "token") String authcode) throws Exception {
+        final GoogleUserCredentialProvider provider = GoogleUserCredentialProvider.login(httpClient, authcode);
         final String withToken = "/pokemons.html?refreshToken=" + provider.getRefreshToken();
         return new RedirectView(withToken);
     }
@@ -61,21 +69,21 @@ public class Endpoint {
 
     @RequestMapping(method = RequestMethod.GET, value = "pokemon-list-json")
     public PokemonListData pokemonListJson(@RequestParam(value = "refreshToken") String refreshToken) throws Exception {
-        PokemonGo go = new PokemonGo(new GoogleUserCredentialProvider(httpClient, refreshToken), httpClient);
+        final RequestHandler requestHandler = requestHandlerHolder.byRefreshToken(refreshToken);
 
-        final PlayerProfile playerProfile = go.getPlayerProfile();
-        final PlayerDataOuterClass.PlayerData playerData = playerProfile.getPlayerData();
-        final Inventories inventories = go.getInventories();
-        final List<Pokemon> pokemons = inventories.getPokebank().getPokemons();
-        final CandyJar candyjar = inventories.getCandyjar();
-        final int playerLevel = playerProfile.getStats().getLevel();
+
+        final PlayerDataOuterClass.PlayerData playerData = getPlayerData(requestHandler);
+        final Inventories inventories = getInventories(requestHandler);
+        final List<PokemonDataOuterClass.PokemonData> pokemons = inventories.getPokemons();
+        final Map<PokemonFamilyIdOuterClass.PokemonFamilyId, Integer> candyjar = inventories.getCandies();
+        final int playerLevel = inventories.getPlayerStats().getLevel();
 
         final PokemonListData data = new PokemonListData();
 
         data.setUserName(playerData.getUsername());
         data.setUserLevel(playerLevel);
 
-        final Map<PokemonIdOuterClass.PokemonId, List<Pokemon>> pokemonsById = groupPokemons(pokemons);
+        final Map<PokemonIdOuterClass.PokemonId, List<PokemonDataOuterClass.PokemonData>> pokemonsById = groupPokemons(pokemons);
 
         List<PokemonClassData> pokemonClassDatas = new ArrayList<>();
 
@@ -94,7 +102,7 @@ public class Endpoint {
     @RequestMapping(method = RequestMethod.GET, value = "evolve")
     public EvolveResult evolve(@RequestParam("pokemonId") long pokemonId, @RequestParam("playerLevel") int playerLevel, @RequestParam(value = "refreshToken") String refreshToken) {
         try {
-            PokemonGo go = new PokemonGo(new GoogleUserCredentialProvider(httpClient, refreshToken), httpClient);
+            final RequestHandler requestHandler = requestHandlerHolder.byRefreshToken(refreshToken);
 
             EvolvePokemonMessageOuterClass.EvolvePokemonMessage reqMsg =
                     EvolvePokemonMessageOuterClass.EvolvePokemonMessage.newBuilder().
@@ -102,7 +110,7 @@ public class Endpoint {
                             build();
 
             ServerRequest serverRequest = new ServerRequest(RequestTypeOuterClass.RequestType.EVOLVE_POKEMON, reqMsg);
-            go.getRequestHandler().sendServerRequests(serverRequest);
+            requestHandler.sendServerRequests(serverRequest);
 
             EvolvePokemonResponseOuterClass.EvolvePokemonResponse response =
                     EvolvePokemonResponseOuterClass.EvolvePokemonResponse.parseFrom(serverRequest.getData());
@@ -112,7 +120,7 @@ public class Endpoint {
                         response.getCandyAwarded(),
                         response.getEvolvedPokemonData().getPokemonId().name(),
                         convertToPokemonData(response.getEvolvedPokemonData(), playerLevel)
-                        );
+                );
             } else {
                 return EvolveResult.failed("Can not evolve pokemon because of " + response.getResult());
             }
@@ -125,14 +133,15 @@ public class Endpoint {
     @RequestMapping(method = RequestMethod.GET, value = "transfer")
     public TransferResult transfer(@RequestParam("pokemonId") long pokemonId, @RequestParam(value = "refreshToken") String refreshToken) {
         try {
-            PokemonGo go = new PokemonGo(new GoogleUserCredentialProvider(httpClient, refreshToken), httpClient);
+            final RequestHandler requestHandler = requestHandlerHolder.byRefreshToken(refreshToken);
+
             ReleasePokemonMessageOuterClass.ReleasePokemonMessage reqMsg =
                     ReleasePokemonMessageOuterClass.ReleasePokemonMessage.
                             newBuilder().
                             setPokemonId(pokemonId).build();
 
             ServerRequest serverRequest = new ServerRequest(RequestTypeOuterClass.RequestType.RELEASE_POKEMON, reqMsg);
-            go.getRequestHandler().sendServerRequests(serverRequest);
+            requestHandler.sendServerRequests(serverRequest);
 
             ReleasePokemonResponseOuterClass.ReleasePokemonResponse response;
             response = ReleasePokemonResponseOuterClass.ReleasePokemonResponse.parseFrom(serverRequest.getData());
@@ -153,7 +162,7 @@ public class Endpoint {
     @RequestMapping(method = RequestMethod.GET, value = "favoritize")
     public FavoritizeResult favoritize(@RequestParam("pokemonId") long pokemonId, @RequestParam(value = "favorite") boolean favorite, @RequestParam(value = "refreshToken") String refreshToken) {
         try {
-            PokemonGo go = new PokemonGo(new GoogleUserCredentialProvider(httpClient, refreshToken), httpClient);
+            PokemonGo go = new PokemonGo(credentialProviderHolder.byRefreshToken(refreshToken), httpClient);
             SetFavoritePokemonMessageOuterClass.SetFavoritePokemonMessage reqMsg = SetFavoritePokemonMessageOuterClass.SetFavoritePokemonMessage.newBuilder()
                     .setPokemonId(pokemonId)
                     .setIsFavorite(favorite)
@@ -180,10 +189,83 @@ public class Endpoint {
         }
     }
 
-    private PokemonClassData generatePokemonClassData(PokemonIdOuterClass.PokemonId pokemonClassId, List<Pokemon> pokemons, CandyJar candyjar, int playerLevel) {
+    public PlayerDataOuterClass.PlayerData getPlayerData(RequestHandler requestHandler) throws RemoteServerException, LoginFailedException {
+
+        GetPlayerMessageOuterClass.GetPlayerMessage getPlayerReqMsg = GetPlayerMessageOuterClass.GetPlayerMessage.newBuilder().build();
+        ServerRequest getPlayerServerRequest = new ServerRequest(RequestTypeOuterClass.RequestType.GET_PLAYER, getPlayerReqMsg);
+        requestHandler.sendServerRequests(getPlayerServerRequest);
+
+        GetPlayerResponseOuterClass.GetPlayerResponse playerResponse = null;
+        try {
+            playerResponse = GetPlayerResponseOuterClass.GetPlayerResponse.parseFrom(getPlayerServerRequest.getData());
+        } catch (InvalidProtocolBufferException e) {
+            throw new RemoteServerException(e);
+        }
+
+        return playerResponse.getPlayerData();
+    }
+
+    public Inventories getInventories(RequestHandler requestHandler) throws LoginFailedException, RemoteServerException {
+        GetInventoryMessageOuterClass.GetInventoryMessage invReqMsg = GetInventoryMessageOuterClass.GetInventoryMessage.newBuilder()
+                .setLastTimestampMs(0)
+                .build();
+        ServerRequest inventoryRequest = new ServerRequest(RequestTypeOuterClass.RequestType.GET_INVENTORY, invReqMsg);
+        requestHandler.sendServerRequests(inventoryRequest);
+
+        GetInventoryResponseOuterClass.GetInventoryResponse response = null;
+        try {
+            response = GetInventoryResponseOuterClass.GetInventoryResponse.parseFrom(inventoryRequest.getData());
+        } catch (InvalidProtocolBufferException e) {
+            throw new RemoteServerException(e);
+        }
+
+        final List<PokemonDataOuterClass.PokemonData> pokemons = new ArrayList<>();
+        final List<EggPokemon> eggs = new ArrayList<>();
+        final List<Item> items = new ArrayList<>();
+        final Map<PokemonFamilyIdOuterClass.PokemonFamilyId, Integer> candies = new HashMap<>();
+        Stats stats = null;
+
+        for (InventoryItemOuterClass.InventoryItem inventoryItem : response.getInventoryDelta().getInventoryItemsList()) {
+            InventoryItemDataOuterClass.InventoryItemData itemData = inventoryItem.getInventoryItemData();
+
+            // hatchery
+            if (itemData.getPokemonData().getPokemonId() == PokemonIdOuterClass.PokemonId.MISSINGNO && itemData.getPokemonData().getIsEgg()) {
+                eggs.add(new EggPokemon(itemData.getPokemonData()));
+            }
+
+            // pokebank
+            if (itemData.getPokemonData().getPokemonId() != PokemonIdOuterClass.PokemonId.MISSINGNO) {
+                pokemons.add(inventoryItem.getInventoryItemData().getPokemonData());
+            }
+
+            // items
+            if (itemData.getItem().getItemId() != ItemIdOuterClass.ItemId.UNRECOGNIZED
+                    && itemData.getItem().getItemId() != ItemIdOuterClass.ItemId.ITEM_UNKNOWN) {
+                ItemDataOuterClass.ItemData item = itemData.getItem();
+                items.add(new Item(item));
+            }
+
+            // candyjar
+            if (itemData.getCandy().getFamilyId() != PokemonFamilyIdOuterClass.PokemonFamilyId.UNRECOGNIZED
+                    && itemData.getCandy().getFamilyId() != PokemonFamilyIdOuterClass.PokemonFamilyId.FAMILY_UNSET) {
+                candies.put(
+                        itemData.getCandy().getFamilyId(),
+                        itemData.getCandy().getCandy()
+                );
+            }
+
+            if (itemData.hasPlayerStats()) {
+                stats = new Stats(itemData.getPlayerStats());
+            }
+        }
+
+        return new Inventories(pokemons, eggs, items, candies, stats);
+    }
+
+    private PokemonClassData generatePokemonClassData(PokemonIdOuterClass.PokemonId pokemonClassId, List<PokemonDataOuterClass.PokemonData> pokemons, Map<PokemonFamilyIdOuterClass.PokemonFamilyId, Integer> candyjar, int playerLevel) {
 
         final PokemonMeta pokemonMeta = PokemonMetaRegistry.getMeta(pokemonClassId);
-        final int totalCandies = candyjar.getCandies(pokemonMeta.getFamily());
+        final int totalCandies = candyjar.get(pokemonMeta.getFamily());
         final int candyToEvolve = pokemonMeta.getCandyToEvolve();
 
         final PokemonClassData pokemonClassData = new PokemonClassData();
@@ -199,7 +281,7 @@ public class Endpoint {
 
         final List<PokemonData> pokemonDatas = pokemons.
                 stream().
-                map(pokemon -> convertToPokemonData(pokemon.getProto(), playerLevel)).
+                map(pokemon -> convertToPokemonData(pokemon, playerLevel)).
                 collect(Collectors.toList());
 
         pokemonClassData.setPokemons(pokemonDatas);
@@ -271,9 +353,9 @@ public class Endpoint {
                 playerLevel);
     }
 
-    private Map<PokemonIdOuterClass.PokemonId, List<Pokemon>> groupPokemons(List<Pokemon> pokemons) {
+    private Map<PokemonIdOuterClass.PokemonId, List<PokemonDataOuterClass.PokemonData>> groupPokemons(List<PokemonDataOuterClass.PokemonData> pokemons) {
         return pokemons.stream().collect(Collectors.toMap(
-                PokemonDetails::getPokemonId,
+                PokemonDataOuterClass.PokemonData::getPokemonId,
                 Collections::singletonList,
                 (pokemonsLeft, pokemonsRight) ->
                         Stream.

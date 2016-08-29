@@ -46,6 +46,9 @@
         </encoder>
     </appender>
 
+    <logger name="org.eclipse.jetty" level="INFO"/>
+    <logger name="org.springframework" level="INFO"/>
+
     <root level="${minLevel}">
         <if condition='property("LOGBACK_WRITE_TO_FILE").equals("true")'>
             <then>
