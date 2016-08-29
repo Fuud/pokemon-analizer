@@ -11,18 +11,23 @@ import POGOProtos.Inventory.Item.ItemIdOuterClass;
 import POGOProtos.Networking.Requests.Messages.*;
 import POGOProtos.Networking.Requests.RequestTypeOuterClass;
 import POGOProtos.Networking.Responses.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.pokegoapi.api.PokemonGo;
-import com.pokegoapi.api.inventory.*;
-import com.pokegoapi.api.pokemon.*;
+import com.pokegoapi.api.inventory.Item;
+import com.pokegoapi.api.inventory.Stats;
+import com.pokegoapi.api.pokemon.EggPokemon;
+import com.pokegoapi.api.pokemon.PokemonMeta;
+import com.pokegoapi.api.pokemon.PokemonMetaRegistry;
 import com.pokegoapi.exceptions.LoginFailedException;
 import com.pokegoapi.exceptions.RemoteServerException;
+import com.pokegoapi.main.CommonRequest;
 import com.pokegoapi.main.ServerRequest;
 import fuud.copied.GoogleUserCredentialProvider;
 import fuud.copied.PokemonCpUtils;
 import fuud.copied.RequestHandler;
 import fuud.dto.*;
-import fuud.dto.Inventories;
 import okhttp3.OkHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -161,8 +166,7 @@ public class Endpoint {
 
     @RequestMapping(method = RequestMethod.GET, value = "favoritize")
     public FavoritizeResult favoritize(@RequestParam("pokemonId") long pokemonId, @RequestParam(value = "favorite") boolean favorite, @RequestParam(value = "refreshToken") String refreshToken) {
-        try {
-            PokemonGo go = new PokemonGo(credentialProviderHolder.byRefreshToken(refreshToken), httpClient);
+        try (CloseablePokemonGo go = new CloseablePokemonGo(credentialProviderHolder.byRefreshToken(refreshToken), httpClient)) {
             SetFavoritePokemonMessageOuterClass.SetFavoritePokemonMessage reqMsg = SetFavoritePokemonMessageOuterClass.SetFavoritePokemonMessage.newBuilder()
                     .setPokemonId(pokemonId)
                     .setIsFavorite(favorite)
@@ -260,6 +264,24 @@ public class Endpoint {
         }
 
         return new Inventories(pokemons, eggs, items, candies, stats);
+    }
+
+    public static ServerRequest[] fillRequest(ServerRequest request) {
+        ServerRequest[] serverRequests = new ServerRequest[5];
+        serverRequests[0] = request;
+        serverRequests[1] = new ServerRequest(RequestTypeOuterClass.RequestType.GET_HATCHED_EGGS,
+                GetHatchedEggsMessageOuterClass.GetHatchedEggsMessage.getDefaultInstance());
+        serverRequests[2] = new ServerRequest(RequestTypeOuterClass.RequestType.GET_INVENTORY,
+                GetInventoryMessageOuterClass.GetInventoryMessage.newBuilder()
+                        .setLastTimestampMs(0)
+                        .build());
+        serverRequests[3] = new ServerRequest(RequestTypeOuterClass.RequestType.CHECK_AWARDED_BADGES,
+                CheckAwardedBadgesMessageOuterClass.CheckAwardedBadgesMessage.getDefaultInstance());
+        serverRequests[4] = new ServerRequest(RequestTypeOuterClass.RequestType.DOWNLOAD_SETTINGS,
+                DownloadSettingsMessageOuterClass.DownloadSettingsMessage.newBuilder()
+                        .setHash("")
+                        .build());
+        return serverRequests;
     }
 
     private PokemonClassData generatePokemonClassData(PokemonIdOuterClass.PokemonId pokemonClassId, List<PokemonDataOuterClass.PokemonData> pokemons, Map<PokemonFamilyIdOuterClass.PokemonFamilyId, Integer> candyjar, int playerLevel) {
@@ -466,6 +488,20 @@ public class Endpoint {
             return "0" + pokemonIdNumber + ".png";
         }
         return pokemonIdNumber + ".png";
+    }
+
+    public static void main(String[] args) throws Exception {
+        final OkHttpClient httpClient = new HttpClientFactory().okHttpClient();
+        final CredentialProviderHolder credentialProviderHolder = new CredentialProviderHolder(httpClient);
+        final RequestHandlerHolder requestHandlerHolder = new RequestHandlerHolder(httpClient, credentialProviderHolder);
+        final Endpoint endpoint = new Endpoint(httpClient, credentialProviderHolder, requestHandlerHolder);
+
+        final ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
+
+        final PokemonListData result = endpoint.pokemonListJson("1/90zLe6ZgabcQ-lAZmJYF5mTJ3gUIFjbMUHGHGuUOT7k");
+
+        System.out.println(objectMapper.writeValueAsString(result));
     }
 
 }
