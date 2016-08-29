@@ -13,12 +13,10 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 
 public class CloseablePokemonGo extends PokemonGo implements Closeable{
-    public CloseablePokemonGo(CredentialProvider credentialProvider, OkHttpClient client, Time time) throws LoginFailedException, RemoteServerException {
-        super(credentialProvider, client, time);
-    }
 
     public CloseablePokemonGo(CredentialProvider credentialProvider, OkHttpClient client) throws LoginFailedException, RemoteServerException {
-        super(credentialProvider, client);
+        super(client);
+        login(credentialProvider);
     }
 
     @Override
