@@ -5,6 +5,8 @@ JMX_PARAMS="$JMX_PARAMS -Dcom.sun.management.jmxremote.authenticate=false"
 JMX_PARAMS="$JMX_PARAMS -Dcom.sun.management.jmxremote.ssl=false"
 JMX_PARAMS="$JMX_PARAMS -Djava.rmi.server.hostname=$EXTERNAL_HOST_IP"
 
+mkdir -p /var/log/pokemons
+
 echo " "                              >> /var/log/pokemons/pokemons.stdout
 echo " "                              >> /var/log/pokemons/pokemons.stdout
 echo "==============================" >> /var/log/pokemons/pokemons.stdout
