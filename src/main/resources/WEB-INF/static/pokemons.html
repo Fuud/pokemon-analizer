@@ -74,12 +74,25 @@
             <tr ng-repeat-end
                 ng-repeat="pokemon in pokemonClass.pokemons track by pokemon.pokemonId"
                 ng-class="{row_separator: $index % 5 == 0 && $index != 0}">
-                <td><img
-                        src="sprites/{{pokemon.favorite?'favorite.png':'non-favorite.png'}}"
-                        width="16"
-                        height="16"
-                        ng-click="setFavorite(pokemonClass, pokemon, !pokemon.favorite)"
-                />
+                <td class="marks">
+                    <img
+                            src="sprites/good_move_1.png"
+                            width="16"
+                            height="16"
+                            ng-if="pokemon.firstAttackMatch"
+                    />
+                    <img
+                            src="sprites/good_move_2.png"
+                            width="16"
+                            height="16"
+                            ng-if="pokemon.secondAttackMatch"
+                    />
+                    <img
+                            src="sprites/{{pokemon.favorite?'favorite.png':'non-favorite.png'}}"
+                            width="16"
+                            height="16"
+                            ng-click="setFavorite(pokemonClass, pokemon, !pokemon.favorite)"
+                    />
                 </td>
                 <td>{{pokemon.cp}}</td>
                 <td>{{pokemon.hp}}</td>

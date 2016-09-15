@@ -15,10 +15,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.pokegoapi.api.inventory.CandyJar;
 import com.pokegoapi.api.inventory.Inventories;
 import com.pokegoapi.api.player.PlayerProfile;
-import com.pokegoapi.api.pokemon.Pokemon;
-import com.pokegoapi.api.pokemon.PokemonDetails;
-import com.pokegoapi.api.pokemon.PokemonMeta;
-import com.pokegoapi.api.pokemon.PokemonMetaRegistry;
+import com.pokegoapi.api.pokemon.*;
 import com.pokegoapi.auth.GoogleUserCredentialProvider;
 import com.pokegoapi.exceptions.RemoteServerException;
 import com.pokegoapi.main.ServerRequest;
@@ -240,6 +237,11 @@ public class Endpoint {
         pokemonData.setRemindingCandiesForMaxLevel(getRemindingCandies(level, 40));
 
         pokemonData.setCreationTimeMs(pokemon.getCreationTimeMs());
+
+        final PokemonType firstAttackType = PokemonMoveMetaRegistry.getMeta(pokemon.getMove1()).getType();
+        final PokemonType secondAttackType = PokemonMoveMetaRegistry.getMeta(pokemon.getMove2()).getType();
+        pokemonData.setFirstAttackMatch(pokemonMeta.getType1() == firstAttackType || pokemonMeta.getType2() == firstAttackType);
+        pokemonData.setSecondAttackMatch(pokemonMeta.getType1() == secondAttackType || pokemonMeta.getType2() == secondAttackType);
 
         return pokemonData;
     }

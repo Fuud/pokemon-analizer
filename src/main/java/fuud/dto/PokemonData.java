@@ -21,6 +21,8 @@ public class PokemonData {
     private int remindingCandiesForYourLevel;
     private int remindingCandiesForMaxLevel;
     private long creationTimeMs;
+    private boolean firstAttackMatch;
+    private boolean secondAttackMatch;
 
     public PokemonData() {
     }
@@ -179,5 +181,21 @@ public class PokemonData {
 
     public long getCreationTimeMs() {
         return creationTimeMs;
+    }
+
+    public boolean isFirstAttackMatch() {
+        return firstAttackMatch;
+    }
+
+    public void setFirstAttackMatch(boolean firstAttackMatch) {
+        this.firstAttackMatch = firstAttackMatch;
+    }
+
+    public boolean isSecondAttackMatch() {
+        return secondAttackMatch;
+    }
+
+    public void setSecondAttackMatch(boolean secondAttackMatch) {
+        this.secondAttackMatch = secondAttackMatch;
     }
 }

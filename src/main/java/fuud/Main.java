@@ -34,7 +34,7 @@ public class Main {
         HandlerList handlerList = new HandlerList();
         handlerList.setHandlers(new Handler[]{resourceHandler, servletHandler});
 
-        final int port = 8080;
+        final int port = 8082;
 
         Server server = new Server(port);
         server.setHandler(handlerList);

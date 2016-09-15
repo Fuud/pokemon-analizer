@@ -14,6 +14,10 @@ td {
     text-align: center;
 }
 
+td.marks {
+    text-align: right;
+}
+
 .row_separator {
     border-top: 3px solid;
 }
