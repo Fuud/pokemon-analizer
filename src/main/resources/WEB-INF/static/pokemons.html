@@ -77,12 +77,14 @@
                 <td class="marks">
                     <img
                             src="sprites/good_move_1.png"
+                            title="First attack match"
                             width="16"
                             height="16"
                             ng-if="pokemon.firstAttackMatch"
                     />
                     <img
                             src="sprites/good_move_2.png"
+                            title="Second attack match"
                             width="16"
                             height="16"
                             ng-if="pokemon.secondAttackMatch"
@@ -115,16 +117,26 @@
                 </td>
 
 
-                <td ng-class="{highlight_button: $index >= evolutionCount(pokemonClass)}"></td>
-                <td>
-                    <input type="button" value="Transfer" ng-disabled="actionsDisabled"
-                           ng-click="transfer(pokemonClass, pokemon)">
+                <td ng-if="!actionsDisabled" ng-class="{highlight_button: $index >= evolutionCount(pokemonClass)}">
+                </td>
+                <td ng-if="!actionsDisabled">
+                    <input
+                            type="button"
+                            value="Transfer"
+                            ng-disabled="actionsDisabled"
+                            ng-click="transfer(pokemonClass, pokemon)"
+                    >
                 </td>
 
-                <td ng-class="{highlight_button: $index < evolutionCount(pokemonClass)}"></td>
-                <td>
-                    <input ng-if="evolvable(pokemonClass)" type="button" value="Evolve" ng-disabled="actionsDisabled"
-                           ng-click="evolve(pokemonClass, pokemon)">
+                <td  ng-if="!actionsDisabled" ng-class="{highlight_button: $index < evolutionCount(pokemonClass)}"></td>
+                <td ng-if="!actionsDisabled" >
+                    <input
+                            ng-if="evolvable(pokemonClass)"
+                            type="button"
+                            value="Evolve"
+                            ng-disabled="actionsDisabled"
+                            ng-click="evolve(pokemonClass, pokemon)"
+                    >
                 </td>
             </tr>
 
