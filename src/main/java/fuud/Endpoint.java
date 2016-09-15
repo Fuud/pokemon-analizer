@@ -252,13 +252,15 @@ public class Endpoint {
         if (pokemonFamily != PokemonFamilyIdOuterClass.PokemonFamilyId.FAMILY_EEVEE) {
             final PokemonIdOuterClass.PokemonId highestForFamily = PokemonMetaRegistry.getHighestForFamily().get(pokemonFamily);
             return "" + getCp(individualAttack, individualDefense, individualStamina, playerLevel, highestForFamily);
-        } else {
+        } else if (pokemonId == PokemonIdOuterClass.PokemonId.EEVEE){
             return "V" + getCp(individualAttack, individualDefense, individualStamina, playerLevel, PokemonIdOuterClass.PokemonId.VAPOREON) +
                     " " +
                     "J" + getCp(individualAttack, individualDefense, individualStamina, playerLevel, PokemonIdOuterClass.PokemonId.JOLTEON) +
                     " " +
                     "F" + getCp(individualAttack, individualDefense, individualStamina, playerLevel, PokemonIdOuterClass.PokemonId.FLAREON);
 
+        }else {
+            return "" + getCp(individualAttack, individualDefense, individualStamina, playerLevel, pokemonId);
         }
     }
 
