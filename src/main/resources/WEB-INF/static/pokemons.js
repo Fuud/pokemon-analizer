@@ -38,6 +38,7 @@ app.controller('pokemonsController', function ($scope, $interval, endpointServic
         endpointService.pokemonList()
             .success(function (data) {
                 $scope.pokemon_data = data;
+                $scope.lastUpdateDate = new Date();
                 $scope.initialized = true;
             })
             .error(function (data) {

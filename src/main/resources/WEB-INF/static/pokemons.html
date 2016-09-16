@@ -20,6 +20,8 @@
         <h1 align="center">{{pokemon_data.userName}}</h1>
         <h1 align="center">Pokemons: {{pokemonCount()}} (today: {{todayPokemonCount()}}, yesterday:
             {{yesterdayPokemonCount()}})</h1>
+        <div align="center">Last update: {{lastUpdateDate | date : 'dd-MM HH:mm:ss'}}.</div>
+        <br>
         <div style="text-align: center">
             <input type="button" value="{{actionsDisabled ? 'Enable actions' : 'Disable actions'}}"
                    ng-click="actionsDisabled = !actionsDisabled">
@@ -72,7 +74,7 @@
             </tr>
 
             <tr ng-repeat-end
-                ng-repeat="pokemon in pokemonClass.pokemons track by pokemon.pokemonId"
+                ng-repeat="pokemon in pokemonClass.pokemons |  orderBy: ['-cp', 'pokemonId'] track by pokemon.pokemonId"
                 ng-class="{row_separator: $index % 5 == 0 && $index != 0}">
                 <td class="marks">
                     <img
