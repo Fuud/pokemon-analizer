@@ -5,6 +5,22 @@ var app = angular.module('pokemons', [], function ($locationProvider) {
     });
 });
 
+app.factory('notAuthorizedInterceptor', function ($q, $window) {
+    return {
+        'responseError': function (rejection) {
+            console.log(rejection)
+            if (rejection.status == 401) {
+                $window.location.href = "/";
+            }
+            return $q.reject(rejection)
+        }
+    }
+});
+
+app.config(['$httpProvider', function ($httpProvider) {
+    $httpProvider.interceptors.push('notAuthorizedInterceptor');
+}]);
+
 app.service('endpointService', function ($http, $location, $window) {
     var refreshToken = $location.search()['refreshToken'];
     if (refreshToken) {
@@ -27,7 +43,7 @@ app.service('endpointService', function ($http, $location, $window) {
     };
 
     this.evolve = function (pokemonId, playerLevel) {
-        return $http.get("/evolve?pokemonId=" + pokemonId + "&playerLevel="+playerLevel+"&refreshToken=" + refreshToken)
+        return $http.get("/evolve?pokemonId=" + pokemonId + "&playerLevel=" + playerLevel + "&refreshToken=" + refreshToken)
     };
 });
 
