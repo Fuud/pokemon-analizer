@@ -17,7 +17,7 @@ public class RefreshTokenStorage {
     private final File refreshTokenStorageFile;
 
     @Autowired
-    public RefreshTokenStorage(@Value(REFRESH_TOKEN_STORAGE_FOLDER_PN) File refreshTokenStorageFolder) {
+    public RefreshTokenStorage(@Value("${"+REFRESH_TOKEN_STORAGE_FOLDER_PN+"}") File refreshTokenStorageFolder) {
         this.refreshTokenStorageFile = refreshTokenStorageFolder;
         if (!refreshTokenStorageFolder.exists()) {
             if (!refreshTokenStorageFolder.mkdirs()) {
