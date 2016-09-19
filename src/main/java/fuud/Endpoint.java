@@ -17,6 +17,7 @@ import com.pokegoapi.api.inventory.Inventories;
 import com.pokegoapi.api.player.PlayerProfile;
 import com.pokegoapi.api.pokemon.*;
 import com.pokegoapi.auth.GoogleUserCredentialProvider;
+import com.pokegoapi.exceptions.LoginFailedException;
 import com.pokegoapi.exceptions.RemoteServerException;
 import com.pokegoapi.main.ServerRequest;
 import fuud.copied.PokemonCpUtils;
@@ -49,36 +50,52 @@ public class Endpoint {
     }
 
     @RequestMapping(method = RequestMethod.GET, value = "get-refresh-token")
-    public RedirectView getRefreshToken(@RequestParam(value = "token") String token) throws Exception {
+    public RedirectView getUserName(@RequestParam(value = "token") String token) throws Exception {
         final GoogleUserCredentialProvider provider = new GoogleUserCredentialProvider(httpClient);
         provider.login(token);
-        final String withToken = "/pokemons.html?refreshToken=" + provider.getRefreshToken();
-        return new RedirectView(withToken);
-    }
 
-    @RequestMapping(method = RequestMethod.GET, value = "pokemon-list")
-    public RedirectView pokemonList(@RequestParam(value = "refreshToken") String refreshToken) throws Exception {
-        final String withToken = "/pokemons.html?refreshToken=" + refreshToken;
-        return new RedirectView(withToken);
+        String userName = null;
+        for (int i = 0; i < 10; i++) {
+            try {
+                userName = service.getUserNameByRefreshToken(provider.getRefreshToken());
+                break;
+            } catch (LoginFailedException e) {
+                return new RedirectView("/");
+            } catch (Exception e) {
+                logger.error(e.getMessage(), e);
+                Thread.sleep(1000);
+            }
+        }
+
+        if (userName == null) {
+            return new RedirectView("/");
+        } else {
+            return new RedirectView("/pokemons.html?username=" + userName);
+        }
     }
 
     @RequestMapping(method = RequestMethod.GET, value = "pokemon-list-json")
-    public PokemonListData pokemonListJson(@RequestParam(value = "refreshToken") String refreshToken) throws Exception {
-        return service.pokemonListJson(refreshToken);
+    public PokemonListData pokemonListJson(@RequestParam(value = "username") String username) throws Exception {
+        return service.pokemonListJson(username);
     }
 
     @RequestMapping(method = RequestMethod.GET, value = "evolve")
-    public EvolveResult evolve(@RequestParam("pokemonId") long pokemonId, @RequestParam("playerLevel") int playerLevel, @RequestParam(value = "refreshToken") String refreshToken) throws Exception {
-        return service.evolve(pokemonId, playerLevel, refreshToken);
+    public EvolveResult evolve(@RequestParam("pokemonId") long pokemonId,
+                               @RequestParam("playerLevel") int playerLevel,
+                               @RequestParam(value = "username") String userName) throws Exception {
+        return service.evolve(pokemonId, playerLevel, userName);
     }
 
     @RequestMapping(method = RequestMethod.GET, value = "transfer")
-    public TransferResult transfer(@RequestParam("pokemonId") long pokemonId, @RequestParam(value = "refreshToken") String refreshToken) throws Exception {
-        return service.transfer(pokemonId, refreshToken);
+    public TransferResult transfer(@RequestParam("pokemonId") long pokemonId,
+                                   @RequestParam(value = "username") String userName) throws Exception {
+        return service.transfer(pokemonId, userName);
     }
 
     @RequestMapping(method = RequestMethod.GET, value = "favoritize")
-    public FavoritizeResult favoritize(@RequestParam("pokemonId") long pokemonId, @RequestParam(value = "favorite") boolean favorite, @RequestParam(value = "refreshToken") String refreshToken) throws Exception {
-        return service.favoritize(pokemonId, favorite, refreshToken);
+    public FavoritizeResult favoritize(@RequestParam("pokemonId") long pokemonId,
+                                       @RequestParam(value = "favorite") boolean favorite,
+                                       @RequestParam(value = "username") String userName) throws Exception {
+        return service.favoritize(pokemonId, favorite, userName);
     }
 }

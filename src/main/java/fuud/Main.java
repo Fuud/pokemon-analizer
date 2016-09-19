@@ -19,6 +19,11 @@ import java.net.URISyntaxException;
 
 public class Main {
     public static void main(String[] args) throws Exception {
+        if (System.getProperty(RefreshTokenStorage.REFRESH_TOKEN_STORAGE_FOLDER_PN) == null) {
+            System.setProperty(RefreshTokenStorage.REFRESH_TOKEN_STORAGE_FOLDER_PN, "./tokens/");
+        }
+
+
         final XmlWebApplicationContext mvcContext = new XmlWebApplicationContext() {
             @Override
             protected Resource getResourceByPath(String path) {
@@ -49,9 +54,9 @@ public class Main {
         handler.setWelcomeFiles(new String[]{"index.html"});
 
         final org.eclipse.jetty.util.resource.Resource baseResource;
-        if (!isRunFromIdea()){
+        if (!isRunFromIdea()) {
             baseResource = org.eclipse.jetty.util.resource.Resource.newClassPathResource("/WEB-INF/static/");
-        }else {
+        } else {
             baseResource = new PathResource(new File(
                     new File(Main.class.getProtectionDomain().getCodeSource().getLocation().toURI()),
                     "../../src/main/resources/WEB-INF/static"

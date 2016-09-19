@@ -25,6 +25,7 @@ import fuud.dto.*;
 import okhttp3.OkHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -37,9 +38,21 @@ import static POGOProtos.Networking.Responses.SetFavoritePokemonResponseOuterCla
 public class Service {
     private static final Logger logger = LoggerFactory.getLogger(Endpoint.class);
     private final OkHttpClient httpClient = new OkHttpClient();
+    private final RefreshTokenStorage refreshTokenStorage;
 
-    public PokemonListData pokemonListJson(String refreshToken) throws Exception {
-        try (CloseablePokemonGo go = new CloseablePokemonGo(new GoogleUserCredentialProvider(httpClient, refreshToken), httpClient)) {
+    @Autowired
+    public Service(RefreshTokenStorage refreshTokenStorage) {
+        this.refreshTokenStorage = refreshTokenStorage;
+    }
+
+    public String getUserNameByRefreshToken(String refreshToken) throws Exception {
+        try (CloseablePokemonGo go = CloseablePokemonGo.createByRefreshToken(refreshToken, refreshTokenStorage, httpClient)) {
+            return go.getPlayerProfile().getPlayerData().getUsername();
+        }
+    }
+
+    public PokemonListData pokemonListJson(String username) throws Exception {
+        try (CloseablePokemonGo go = CloseablePokemonGo.createByUserName(username, refreshTokenStorage, httpClient)) {
 
             final PlayerProfile playerProfile = go.getPlayerProfile();
             final PlayerDataOuterClass.PlayerData playerData = playerProfile.getPlayerData();
@@ -70,8 +83,8 @@ public class Service {
         }
     }
 
-    public EvolveResult evolve(long pokemonId, int playerLevel, String refreshToken) throws LoginFailedException {
-        try (CloseablePokemonGo go = new CloseablePokemonGo(new GoogleUserCredentialProvider(httpClient, refreshToken), httpClient)) {
+    public EvolveResult evolve(long pokemonId, int playerLevel, String userName) throws LoginFailedException {
+        try (CloseablePokemonGo go = CloseablePokemonGo.createByUserName(userName, refreshTokenStorage, httpClient)) {
 
 
             EvolvePokemonMessageOuterClass.EvolvePokemonMessage reqMsg =
@@ -102,8 +115,8 @@ public class Service {
         }
     }
 
-    public TransferResult transfer(long pokemonId, String refreshToken) {
-        try (CloseablePokemonGo go = new CloseablePokemonGo(new GoogleUserCredentialProvider(httpClient, refreshToken), httpClient)) {
+    public TransferResult transfer(long pokemonId, String userName) {
+        try (CloseablePokemonGo go = CloseablePokemonGo.createByUserName(userName, refreshTokenStorage, httpClient)) {
             ReleasePokemonMessageOuterClass.ReleasePokemonMessage reqMsg =
                     ReleasePokemonMessageOuterClass.ReleasePokemonMessage.
                             newBuilder().
@@ -128,8 +141,8 @@ public class Service {
         }
     }
 
-    public FavoritizeResult favoritize(long pokemonId, boolean favorite, String refreshToken) throws LoginFailedException {
-        try (CloseablePokemonGo go = new CloseablePokemonGo(new GoogleUserCredentialProvider(httpClient, refreshToken), httpClient)) {
+    public FavoritizeResult favoritize(long pokemonId, boolean favorite, String userName) throws LoginFailedException {
+        try (CloseablePokemonGo go = CloseablePokemonGo.createByUserName(userName, refreshTokenStorage, httpClient)) {
             SetFavoritePokemonMessageOuterClass.SetFavoritePokemonMessage reqMsg = SetFavoritePokemonMessageOuterClass.SetFavoritePokemonMessage.newBuilder()
                     .setPokemonId(pokemonId)
                     .setIsFavorite(favorite)

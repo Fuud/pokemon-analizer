@@ -2,10 +2,10 @@ package fuud;
 
 import com.pokegoapi.api.PokemonGo;
 import com.pokegoapi.auth.CredentialProvider;
+import com.pokegoapi.auth.GoogleUserCredentialProvider;
 import com.pokegoapi.exceptions.LoginFailedException;
 import com.pokegoapi.exceptions.RemoteServerException;
 import com.pokegoapi.main.RequestHandler;
-import com.pokegoapi.util.Time;
 import okhttp3.OkHttpClient;
 
 import java.io.*;
@@ -15,15 +15,35 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class CloseablePokemonGo extends PokemonGo implements Closeable {
     private static final AtomicInteger threadCounter = new AtomicInteger();
 
-    public CloseablePokemonGo(CredentialProvider credentialProvider, OkHttpClient client) throws LoginFailedException, RemoteServerException {
+    private CloseablePokemonGo(CredentialProvider credentialProvider, OkHttpClient client) throws LoginFailedException, RemoteServerException {
         super(client);
 
-        try{
+        try {
             login(credentialProvider);
-        }catch (Throwable t){
+        } catch (Throwable t) {
             close();
             throw t;
         }
+    }
+
+    public static CloseablePokemonGo createByRefreshToken(String refreshToken, RefreshTokenStorage storage, OkHttpClient client) throws Exception {
+        final GoogleUserCredentialProvider credentialProvider = new GoogleUserCredentialProvider(client, refreshToken);
+        final CloseablePokemonGo closeablePokemonGo = new CloseablePokemonGo(credentialProvider, client);
+        try {
+            closeablePokemonGo.login(credentialProvider);
+            final String username = closeablePokemonGo.getPlayerProfile().getPlayerData().getUsername();
+            storage.storeRefreshToken(username, refreshToken);
+        } catch (Throwable t) {
+            closeablePokemonGo.close();
+            throw t;
+        }
+
+        return closeablePokemonGo;
+    }
+
+    public static CloseablePokemonGo createByUserName(String userName, RefreshTokenStorage storage, OkHttpClient client) throws Exception {
+        final String refreshToken = storage.getRefreshToken(userName);
+        return createByRefreshToken(refreshToken, storage, client);
     }
 
     @Override

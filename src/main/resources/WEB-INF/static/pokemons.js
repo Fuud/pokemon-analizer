@@ -8,8 +8,20 @@ var app = angular.module('pokemons', [], function ($locationProvider) {
 app.factory('notAuthorizedInterceptor', function ($q, $window) {
     return {
         'responseError': function (rejection) {
-            console.log(rejection)
+            console.log(rejection);
             if (rejection.status == 401) {
+                $window.location.href = "/";
+            }
+            return $q.reject(rejection)
+        }
+    }
+});
+
+app.factory('badRequest', function ($q, $window) {
+    return {
+        'responseError': function (rejection) {
+            console.log(rejection);
+            if (rejection.status == 400) {
                 $window.location.href = "/";
             }
             return $q.reject(rejection)
@@ -19,31 +31,32 @@ app.factory('notAuthorizedInterceptor', function ($q, $window) {
 
 app.config(['$httpProvider', function ($httpProvider) {
     $httpProvider.interceptors.push('notAuthorizedInterceptor');
+    $httpProvider.interceptors.push('badRequest');
 }]);
 
 app.service('endpointService', function ($http, $location, $window) {
-    var refreshToken = $location.search()['refreshToken'];
-    if (refreshToken) {
-        console.log("Will use refresh token: " + refreshToken);
+    var username = $location.search()['username'];
+    if (username) {
+        console.log("Will use username: " + username);
     } else {
         // no refresh token - let's autorize
         $window.location = "/";
     }
 
     this.pokemonList = function () {
-        return $http.get('/pokemon-list-json?refreshToken=' + refreshToken)
+        return $http.get('/pokemon-list-json?username=' + username)
     };
 
     this.setFavorite = function (pokemonId, isFavorite) {
-        return $http.get("/favoritize?pokemonId=" + pokemonId + "&favorite=" + isFavorite + "&refreshToken=" + refreshToken)
+        return $http.get("/favoritize?pokemonId=" + pokemonId + "&favorite=" + isFavorite + "&username=" + username)
     };
 
     this.transfer = function (pokemonId) {
-        return $http.get("/transfer?pokemonId=" + pokemonId + "&refreshToken=" + refreshToken)
+        return $http.get("/transfer?pokemonId=" + pokemonId + "&username=" + username)
     };
 
     this.evolve = function (pokemonId, playerLevel) {
-        return $http.get("/evolve?pokemonId=" + pokemonId + "&playerLevel=" + playerLevel + "&refreshToken=" + refreshToken)
+        return $http.get("/evolve?pokemonId=" + pokemonId + "&playerLevel=" + playerLevel + "&username=" + username)
     };
 });
 

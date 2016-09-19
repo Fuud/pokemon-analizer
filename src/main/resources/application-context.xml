@@ -8,7 +8,7 @@
         http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc.xsd
         http://www.springframework.org/schema/task http://www.springframework.org/schema/task/spring-task-3.0.xsd">
 
-    <!--<context:property-placeholder location="${configuration.path}"/>-->
+    <context:property-placeholder/>
     <context:component-scan base-package="fuud"/>
 
     <bean id="jacksonBuilder" class="org.springframework.http.converter.json.Jackson2ObjectMapperBuilder"/>
