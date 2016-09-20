@@ -239,6 +239,9 @@ public class Service {
         pokemonData.setFirstAttackMatch(pokemonMeta.getType1() == firstAttackType || pokemonMeta.getType2() == firstAttackType);
         pokemonData.setSecondAttackMatch(pokemonMeta.getType1() == secondAttackType || pokemonMeta.getType2() == secondAttackType);
 
+        pokemonData.setFirstAttack(pokemon.getMove1().name());
+        pokemonData.setSecondAttack(pokemon.getMove2().name());
+
         return pokemonData;
     }
 

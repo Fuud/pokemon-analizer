@@ -23,6 +23,8 @@ public class PokemonData {
     private long creationTimeMs;
     private boolean firstAttackMatch;
     private boolean secondAttackMatch;
+    private String firstAttack;
+    private String secondAttack;
 
     public PokemonData() {
     }
@@ -197,5 +199,21 @@ public class PokemonData {
 
     public void setSecondAttackMatch(boolean secondAttackMatch) {
         this.secondAttackMatch = secondAttackMatch;
+    }
+
+    public String getFirstAttack() {
+        return firstAttack;
+    }
+
+    public void setFirstAttack(String firstAttack) {
+        this.firstAttack = firstAttack;
+    }
+
+    public String getSecondAttack() {
+        return secondAttack;
+    }
+
+    public void setSecondAttack(String secondAttack) {
+        this.secondAttack = secondAttack;
     }
 }
