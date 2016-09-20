@@ -14,6 +14,7 @@ import POGOProtos.Networking.Responses.SetFavoritePokemonResponseOuterClass;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.pokegoapi.api.inventory.CandyJar;
 import com.pokegoapi.api.inventory.Inventories;
+import com.pokegoapi.api.map.pokemon.EvolutionResult;
 import com.pokegoapi.api.player.PlayerProfile;
 import com.pokegoapi.api.pokemon.*;
 import com.pokegoapi.auth.GoogleUserCredentialProvider;
@@ -38,21 +39,21 @@ import static POGOProtos.Networking.Responses.SetFavoritePokemonResponseOuterCla
 public class Service {
     private static final Logger logger = LoggerFactory.getLogger(Endpoint.class);
     private final OkHttpClient httpClient = new OkHttpClient();
-    private final RefreshTokenStorage refreshTokenStorage;
+    private final CloseablePokemonGoProvider closeablePokemonGoProvider;
 
     @Autowired
-    public Service(RefreshTokenStorage refreshTokenStorage) {
-        this.refreshTokenStorage = refreshTokenStorage;
+    public Service(CloseablePokemonGoProvider closeablePokemonGoProvider) {
+        this.closeablePokemonGoProvider = closeablePokemonGoProvider;
     }
 
     public String getUserNameByRefreshToken(String refreshToken) throws Exception {
-        try (CloseablePokemonGo go = CloseablePokemonGo.createByRefreshToken(refreshToken, refreshTokenStorage, httpClient)) {
+        try (CloseablePokemonGo go = closeablePokemonGoProvider.getByRefreshToken(refreshToken)) {
             return go.getPlayerProfile().getPlayerData().getUsername();
         }
     }
 
     public PokemonListData pokemonListJson(String username) throws Exception {
-        try (CloseablePokemonGo go = CloseablePokemonGo.createByUserName(username, refreshTokenStorage, httpClient)) {
+        try (CloseablePokemonGo go = closeablePokemonGoProvider.getByUserName(username)) {
 
             final PlayerProfile playerProfile = go.getPlayerProfile();
             final PlayerDataOuterClass.PlayerData playerData = playerProfile.getPlayerData();
@@ -84,28 +85,18 @@ public class Service {
     }
 
     public EvolveResult evolve(long pokemonId, int playerLevel, String userName) throws LoginFailedException {
-        try (CloseablePokemonGo go = CloseablePokemonGo.createByUserName(userName, refreshTokenStorage, httpClient)) {
+        try (CloseablePokemonGo go = closeablePokemonGoProvider.getByUserName(userName)) {
 
+            final EvolutionResult evolutionResult = go.getInventories().getPokebank().getPokemonById(pokemonId).evolve();
 
-            EvolvePokemonMessageOuterClass.EvolvePokemonMessage reqMsg =
-                    EvolvePokemonMessageOuterClass.EvolvePokemonMessage.newBuilder().
-                            setPokemonId(pokemonId).
-                            build();
-
-            ServerRequest serverRequest = new ServerRequest(RequestTypeOuterClass.RequestType.EVOLVE_POKEMON, reqMsg);
-            go.getRequestHandler().sendServerRequests(serverRequest);
-
-            EvolvePokemonResponseOuterClass.EvolvePokemonResponse response =
-                    EvolvePokemonResponseOuterClass.EvolvePokemonResponse.parseFrom(serverRequest.getData());
-
-            if (response.getResult() == EvolvePokemonResponseOuterClass.EvolvePokemonResponse.Result.SUCCESS) {
+            if (evolutionResult.getResult() == EvolvePokemonResponseOuterClass.EvolvePokemonResponse.Result.SUCCESS) {
                 return EvolveResult.success(
-                        response.getCandyAwarded(),
-                        response.getEvolvedPokemonData().getPokemonId().name(),
-                        convertToPokemonData(response.getEvolvedPokemonData(), playerLevel)
+                        evolutionResult.getCandyAwarded(),
+                        evolutionResult.getEvolvedPokemon().getPokemonId().name(),
+                        convertToPokemonData(evolutionResult.getEvolvedPokemon().getProto(), playerLevel)
                 );
             } else {
-                return EvolveResult.failed("Can not evolve pokemon because of " + response.getResult());
+                return EvolveResult.failed("Can not evolve pokemon because of " + evolutionResult.getResult());
             }
         } catch (LoginFailedException e) {
             throw e;
@@ -116,24 +107,14 @@ public class Service {
     }
 
     public TransferResult transfer(long pokemonId, String userName) {
-        try (CloseablePokemonGo go = CloseablePokemonGo.createByUserName(userName, refreshTokenStorage, httpClient)) {
-            ReleasePokemonMessageOuterClass.ReleasePokemonMessage reqMsg =
-                    ReleasePokemonMessageOuterClass.ReleasePokemonMessage.
-                            newBuilder().
-                            setPokemonId(pokemonId).build();
+        try (CloseablePokemonGo go = closeablePokemonGoProvider.getByUserName(userName)) {
+            final ReleasePokemonResponseOuterClass.ReleasePokemonResponse.Result result =
+                    go.getInventories().getPokebank().getPokemonById(pokemonId).transferPokemon();
 
-            ServerRequest serverRequest = new ServerRequest(RequestTypeOuterClass.RequestType.RELEASE_POKEMON, reqMsg);
-            go.getRequestHandler().sendServerRequests(serverRequest);
-
-            ReleasePokemonResponseOuterClass.ReleasePokemonResponse response;
-            response = ReleasePokemonResponseOuterClass.ReleasePokemonResponse.parseFrom(serverRequest.getData());
-
-            response.getCandyAwarded();
-
-            if (response.getResult() == ReleasePokemonResponseOuterClass.ReleasePokemonResponse.Result.SUCCESS) {
-                return TransferResult.success(response.getCandyAwarded());
+            if (result == ReleasePokemonResponseOuterClass.ReleasePokemonResponse.Result.SUCCESS) {
+                return TransferResult.success(1);
             } else {
-                return TransferResult.failed("Can not transfer pokemon because of " + response.getResult());
+                return TransferResult.failed("Can not transfer pokemon because of " + result);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -142,27 +123,15 @@ public class Service {
     }
 
     public FavoritizeResult favoritize(long pokemonId, boolean favorite, String userName) throws LoginFailedException {
-        try (CloseablePokemonGo go = CloseablePokemonGo.createByUserName(userName, refreshTokenStorage, httpClient)) {
-            SetFavoritePokemonMessageOuterClass.SetFavoritePokemonMessage reqMsg = SetFavoritePokemonMessageOuterClass.SetFavoritePokemonMessage.newBuilder()
-                    .setPokemonId(pokemonId)
-                    .setIsFavorite(favorite)
-                    .build();
-
-            ServerRequest serverRequest = new ServerRequest(RequestTypeOuterClass.RequestType.SET_FAVORITE_POKEMON, reqMsg);
-            go.getRequestHandler().sendServerRequests(serverRequest);
-
-            SetFavoritePokemonResponseOuterClass.SetFavoritePokemonResponse response;
-            try {
-                response = SetFavoritePokemonResponseOuterClass.SetFavoritePokemonResponse.parseFrom(serverRequest.getData());
-            } catch (InvalidProtocolBufferException e) {
-                throw new RemoteServerException(e);
-            }
-
-            if (response.getResult() == SUCCESS) {
+        try (CloseablePokemonGo go = closeablePokemonGoProvider.getByUserName(userName)) {
+            final SetFavoritePokemonResponseOuterClass.SetFavoritePokemonResponse.Result result =
+                    go.getInventories().getPokebank().getPokemonById(pokemonId).setFavoritePokemon(favorite);
+            if (result == SUCCESS) {
                 return FavoritizeResult.success();
             } else {
-                return FavoritizeResult.failed("Can not change favorite because if " + response.getResult());
+                return FavoritizeResult.failed("Can not change favorite because if " + result);
             }
+
         } catch (LoginFailedException e) {
             throw e;
         } catch (Exception e) {
