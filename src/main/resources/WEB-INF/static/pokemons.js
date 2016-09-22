@@ -34,7 +34,7 @@ app.config(['$httpProvider', function ($httpProvider) {
     $httpProvider.interceptors.push('badRequest');
 }]);
 
-app.service('endpointService', function ($http, $location, $window) {
+app.service('pokemonEndpointService', function ($http, $location, $window) {
     var username = $location.search()['username'];
     if (username) {
         console.log("Will use username: " + username);
@@ -60,11 +60,35 @@ app.service('endpointService', function ($http, $location, $window) {
     };
 });
 
-app.controller('pokemonsController', function ($scope, $interval, endpointService) {
+app.service('usersEndpointService', function ($http, $location, $window) {
+    this.userList = function () {
+        return $http.get('/users')
+    };
+});
+
+app.controller('usersController', function ($scope, $interval, usersEndpointService) {
+    $scope.initialized = false;
+    var init = function () {
+        usersEndpointService.userList()
+            .success(function (data) {
+                $scope.userList = data;
+                $scope.initialized = true;
+            })
+            .error(function (data) {
+                setTimeout(init, 1000);
+            });
+    };
+
+    init();
+
+    $interval(init, 10000);
+});
+
+app.controller('pokemonsController', function ($scope, $interval, pokemonEndpointService) {
     $scope.initialized = false;
 
     var init = function () {
-        endpointService.pokemonList()
+        pokemonEndpointService.pokemonList()
             .success(function (data) {
                 $scope.pokemon_data = data;
                 $scope.lastUpdateDate = new Date();
@@ -194,7 +218,7 @@ app.controller('pokemonsController', function ($scope, $interval, endpointServic
     };
 
     $scope.setFavorite = function (pokemonClass, pokemon, isFavorite) {
-        endpointService.setFavorite(pokemon.pokemonId, isFavorite)
+        pokemonEndpointService.setFavorite(pokemon.pokemonId, isFavorite)
             .success(function (data) {
                 if (data.success) {
                     pokemon.favorite = isFavorite;
@@ -212,7 +236,7 @@ app.controller('pokemonsController', function ($scope, $interval, endpointServic
             alert("Can not transfer favorite pokemon");
             return;
         }
-        endpointService.transfer(pokemon.pokemonId)
+        pokemonEndpointService.transfer(pokemon.pokemonId)
             .success(function (data) {
                 if (data.success) {
                     $scope.awardCandies(pokemonClass.pokemonFamilyId, data.candyAwarded);
@@ -231,7 +255,7 @@ app.controller('pokemonsController', function ($scope, $interval, endpointServic
             alert("Can not evolve favorite pokemon");
             return;
         }
-        endpointService.evolve(pokemon.pokemonId, $scope.pokemon_data.userLevel)
+        pokemonEndpointService.evolve(pokemon.pokemonId, $scope.pokemon_data.userLevel)
             .success(function (data) {
                 if (data.success) {
                     $scope.awardCandies(pokemonClass.pokemonFamilyId, data.candyAwarded);

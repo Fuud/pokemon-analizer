@@ -9,6 +9,9 @@ import org.springframework.util.StringUtils;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.PrintWriter;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Scanner;
 
 @Component
@@ -50,6 +53,15 @@ public class RefreshTokenStorage {
             }
         } catch (FileNotFoundException e) {
             throw new LoginFailedException("refresh token is not registered", e);
+        }
+    }
+
+    public List<String> getUserNames() {
+        final String[] files = refreshTokenStorageFile.list();
+        if (files==null){
+            return Collections.emptyList();
+        }else {
+            return Arrays.asList(files);
         }
     }
 }

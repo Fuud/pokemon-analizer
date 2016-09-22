@@ -43,10 +43,17 @@ public class Endpoint {
     private static final Logger logger = LoggerFactory.getLogger(Endpoint.class);
     private final OkHttpClient httpClient = new OkHttpClient();
     private final Service service;
+    private final RefreshTokenStorage refreshTokenStorage;
 
     @Autowired
-    public Endpoint(Service service) {
+    public Endpoint(Service service, RefreshTokenStorage refreshTokenStorage) {
         this.service = service;
+        this.refreshTokenStorage = refreshTokenStorage;
+    }
+
+    @RequestMapping(method = RequestMethod.GET, value = "users")
+    public List<String> listUsers() {
+        return refreshTokenStorage.getUserNames();
     }
 
     @RequestMapping(method = RequestMethod.GET, value = "get-refresh-token")
